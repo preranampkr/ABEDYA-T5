@@ -149,7 +149,7 @@ export interface ProviderResult<TValue> {
 
 export interface LiveDataProvider {
   getSourceStatuses(): Promise<DataSourceStatus[]>
-  getCurrentObservations(): Promise<ProviderResult<Observation<number | WeatherReading>[]>>
+  getCurrentObservations(): Promise<ProviderResult<Observation<number | WeatherReading>>>
   getOfficialAlerts(): Promise<ProviderResult<OfficialAlert>>
   getForecasts(): Promise<ProviderResult<Forecast>>
 }
