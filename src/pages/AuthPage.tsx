@@ -110,6 +110,14 @@ function AuthPage({ role, mode }: AuthPageProps) {
             </Button>
             {message && <p className="form-message" role="status" aria-live="polite">{message}</p>}
           </form>
+          <div className="auth-dev-actions">
+            <Button asChild className="button button-outline button-small" variant="outline" size="sm">
+              <Link to={`/${role}/dashboard`}>Open dashboard (development access)</Link>
+            </Button>
+            <Button asChild className="button button-outline button-small" variant="outline" size="sm">
+              <Link to={`/${role}/drishti`}>Open DRISHTI (development access)</Link>
+            </Button>
+          </div>
           <p className="auth-switch">
             {isSignup ? 'Already have a profile?' : 'New to ABHEDYA?'}{' '}
             <Link to={`/${role}/${isSignup ? 'login' : 'signup'}`}>{isSignup ? 'Sign in' : 'Register'}</Link>

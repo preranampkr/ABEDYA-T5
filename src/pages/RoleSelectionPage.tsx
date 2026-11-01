@@ -25,6 +25,7 @@ function RoleSelectionPage() {
             <p>For people affected by flooding who need information, assistance and recovery support.</p>
             <div className="role-card-actions">
               <Button asChild className="button button-primary"><Link to="/victim/login">Continue as Victim <ArrowRight size={15} aria-hidden="true" /></Link></Button>
+              <Button asChild className="button button-outline button-small" variant="outline" size="sm"><Link to="/victim/dashboard">Open dashboard</Link></Button>
               <Link className="text-action" to="/victim/signup">Create a profile</Link>
             </div>
           </section>
@@ -36,11 +37,12 @@ function RoleSelectionPage() {
             <p>For volunteers and authorised coordinators who help monitor incidents and coordinate response efforts.</p>
             <div className="role-card-actions">
               <Button asChild className="button button-primary"><Link to="/helper/login">Continue as Helper <ArrowRight size={15} aria-hidden="true" /></Link></Button>
+              <Button asChild className="button button-outline button-small" variant="outline" size="sm"><Link to="/helper/dashboard">Open dashboard</Link></Button>
               <Link className="text-action" to="/helper/signup">Create a profile</Link>
             </div>
           </section>
         </div>
-        <p className="prototype-note">Frontend prototype only. Profiles are not created, stored or verified.</p>
+        <p className="prototype-note">Frontend prototype only. Profiles are not created, stored or verified. Development access links open the dashboard and DRISHTI module without creating a real account.</p>
       </main>
     </div>
   )

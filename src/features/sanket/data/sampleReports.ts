@@ -1,0 +1,89 @@
+import type { SanketReport, SanketHelperQueueItem } from '../types'
+
+export const sampleReports: SanketReport[] = [
+  {
+    id: 'SNK-0001',
+    reportType: 'incident',
+    category: 'waterlogging',
+    urgency: 'high',
+    status: 'incoming',
+    createdAt: '2026-10-31T08:10:00+05:30',
+    updatedAt: '2026-10-31T08:12:00+05:30',
+    location: {
+      label: 'Near Bus Stand',
+      locality: 'Kundapura Town',
+      taluk: 'Kundapura',
+      district: 'Udupi',
+      latitude: 13.6227,
+      longitude: 74.6913,
+      source: 'manual',
+    },
+    reporter: {
+      name: 'Anitha N.',
+      phone: '+91 98765 43210',
+      contactPreference: 'phone',
+    },
+    assistanceNeeds: ['food_water', 'rescue'],
+    summary: 'Road near bus stand remains waterlogged after heavy rain.',
+    details: 'Water is impeding access for pedestrians and riders. Residents are waiting for assistance.',
+    assignedTo: 'Riya M.',
+    assignmentHistory: [
+      { from: 'submitted', to: 'incoming', at: '2026-10-31T08:12:00+05:30', by: 'Prototype queue', note: 'New report entered' },
+      { from: 'incoming', to: 'under_review', at: '2026-10-31T08:15:00+05:30', by: 'Riya M.', note: 'Initial review completed' },
+      { from: 'under_review', to: 'assigned', at: '2026-10-31T08:20:00+05:30', by: 'Riya M.', note: 'Assigned to field follow-up' },
+    ],
+    provenance: {
+      sourceMode: 'demo',
+      sourceLabel: 'Prototype sample',
+      note: 'Synthetic example data for interface development only.',
+    },
+  },
+  {
+    id: 'SNK-0002',
+    reportType: 'assistance',
+    category: 'medical_assistance',
+    urgency: 'critical',
+    status: 'assigned',
+    createdAt: '2026-10-31T09:05:00+05:30',
+    updatedAt: '2026-10-31T09:18:00+05:30',
+    location: {
+      label: 'Asha Clinic area',
+      locality: 'Byndoor',
+      taluk: 'Byndoor',
+      district: 'Udupi',
+      latitude: 13.8585,
+      longitude: 74.6344,
+      source: 'unverified',
+    },
+    reporter: {
+      name: 'Rakesh P.',
+      phone: '+91 99887 66554',
+      contactPreference: 'sms',
+    },
+    assistanceNeeds: ['medical', 'transport'],
+    summary: 'Family needs urgent medical support and transportation to a clinic.',
+    details: 'A resident is reporting a health concern and is unable to access a vehicle due to disrupted roads.',
+    assignedTo: 'Aarav K.',
+    assignmentHistory: [
+      { from: 'submitted', to: 'incoming', at: '2026-10-31T09:06:00+05:30', by: 'Prototype queue', note: 'New report entered' },
+      { from: 'incoming', to: 'under_review', at: '2026-10-31T09:09:00+05:30', by: 'Aarav K.', note: 'Urgency validated' },
+      { from: 'under_review', to: 'assigned', at: '2026-10-31T09:12:00+05:30', by: 'Aarav K.', note: 'Assigned for medical support review' },
+    ],
+    provenance: {
+      sourceMode: 'demo',
+      sourceLabel: 'Prototype sample',
+      note: 'Synthetic example data for interface development only.',
+    },
+  },
+]
+
+export const sampleHelperQueue: SanketHelperQueueItem[] = sampleReports.map((report) => ({
+  id: report.id,
+  status: report.status,
+  urgency: report.urgency,
+  category: report.category,
+  location: report.location,
+  summary: report.summary,
+  createdAt: report.createdAt,
+  reporterName: report.reporter.name,
+}))

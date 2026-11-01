@@ -38,6 +38,14 @@ export const modulesByRole: Record<UserRole, ModuleDefinition[]> = {
       icon: Eye,
     },
     {
+      id: 'sanket',
+      name: 'SANKET',
+      summary: 'Citizen reports and assistance intake.',
+      purpose: 'A future helper-side queue for reviewing citizen reports and triaging assistance needs.',
+      path: '/helper/sanket',
+      icon: Radio,
+    },
+    {
       id: 'medha',
       name: 'MEDHA',
       summary: 'Incident analysis, geographic clustering and duplicate detection.',

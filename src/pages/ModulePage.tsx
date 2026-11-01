@@ -7,6 +7,7 @@ import { modulesByRole } from '../data/modules'
 import type { UserRole } from '../types/domain'
 
 const DrishtiPage = lazy(() => import('../features/drishti/DrishtiPage'))
+const SanketPage = lazy(() => import('../features/sanket/SanketPage'))
 
 interface ModulePageProps {
   role: UserRole
@@ -21,6 +22,14 @@ function ModulePage({ role, moduleId }: ModulePageProps) {
     return (
       <Suspense fallback={<div className="drishti-loading" role="status">Loading DRISHTI geospatial workspace…</div>}>
         <DrishtiPage role={role} />
+      </Suspense>
+    )
+  }
+
+  if (moduleId === 'sanket') {
+    return (
+      <Suspense fallback={<div className="drishti-loading" role="status">Loading SANKET reporting workspace…</div>}>
+        <SanketPage role={role} />
       </Suspense>
     )
   }

@@ -22,6 +22,7 @@ export const router = createBrowserRouter([
   { path: '/victim/sanket', element: <ModulePage role="victim" moduleId="sanket" /> },
   { path: '/victim/punarjeev', element: <ModulePage role="victim" moduleId="punarjeev" /> },
   { path: '/helper/drishti', element: <ModulePage role="helper" moduleId="drishti" /> },
+  { path: '/helper/sanket', element: <ModulePage role="helper" moduleId="sanket" /> },
   { path: '/helper/medha', element: <ModulePage role="helper" moduleId="medha" /> },
   { path: '/helper/sena', element: <ModulePage role="helper" moduleId="sena" /> },
   { path: '/helper/punarjeev', element: <ModulePage role="helper" moduleId="punarjeev" /> },
