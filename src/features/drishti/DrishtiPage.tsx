@@ -362,7 +362,7 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
               <SectionHeading icon={MapPinned} title="Geography" index="01" />
               <Label className="drishti-field-label" htmlFor="district-select">District</Label>
               <Select value="udupi" onValueChange={() => setSelectedGeography('Udupi District')}>
-                <SelectTrigger id="district-select" className="drishti-select"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="district-select" className="drishti-select"><SelectValue placeholder="Udupi District" /></SelectTrigger>
                 <SelectContent position="popper"><SelectItem value="udupi">Udupi District</SelectItem></SelectContent>
               </Select>
               <Label className="drishti-field-label" htmlFor="taluk-select">Taluk</Label>

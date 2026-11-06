@@ -1,7 +1,7 @@
 import { Brain, Eye, HeartHandshake, Radio, Users } from 'lucide-react'
-import type { ModuleDefinition, UserRole } from '../types/domain'
+import type { ModuleDefinition, WorkspaceRole } from '../types/domain'
 
-export const modulesByRole: Record<UserRole, ModuleDefinition[]> = {
+export const modulesByRole: Record<WorkspaceRole, ModuleDefinition[]> = {
   victim: [
     {
       id: 'drishti',
@@ -49,7 +49,7 @@ export const modulesByRole: Record<UserRole, ModuleDefinition[]> = {
       id: 'medha',
       name: 'MEDHA',
       summary: 'Incident analysis, geographic clustering and duplicate detection.',
-      purpose: 'A future workspace for reviewing incident patterns and possible duplicate reports.',
+      purpose: 'Review SANKET incidents, compare possible duplicates, and prepare verified reports for response coordination.',
       path: '/helper/medha',
       icon: Brain,
     },
@@ -72,7 +72,7 @@ export const modulesByRole: Record<UserRole, ModuleDefinition[]> = {
   ],
 }
 
-export const roleLabels: Record<UserRole, string> = {
+export const roleLabels: Record<WorkspaceRole, string> = {
   victim: 'Victim',
   helper: 'Helper',
 }

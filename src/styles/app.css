@@ -282,7 +282,7 @@ select.text-input:valid { color: var(--paper); }
 .sidebar-status { display: flex; align-items: center; gap: 8px; color: var(--sage); font-size: 10px; }
 .status-dot { width: 7px; height: 7px; display: inline-block; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
 .sidebar-status .status-dot { color: var(--amber); }
-.sidebar-switch { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.sidebar-switch { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 11px; }
 .sidebar-switch:hover { color: var(--paper); }
 .dashboard-main { min-width: 0; flex: 1; background: var(--olive); }
 .dashboard-topbar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 38px; border-bottom: 1px solid var(--border); }

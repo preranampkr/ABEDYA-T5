@@ -1,12 +1,13 @@
 import { AlertTriangle, CheckCircle2, Clock3, FileText, MapPin, Radio, ShieldAlert, UserRound } from 'lucide-react'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import DashboardLayout from '../../components/DashboardLayout'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { reportStore } from './data/reportStore'
-import type { SanketAssistanceNeed, SanketCategory, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
+import { isSupabaseConfigured } from '../../lib/supabase'
+import { reportRepository } from './data/reportRepository'
+import type { SanketAssistanceNeed, SanketCategory, SanketReport, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
 import './sanket.css'
 
 const incidentTypes: { value: SanketReportType; label: string; description: string }[] = [
@@ -43,7 +44,14 @@ const assistanceOptions: { value: SanketAssistanceNeed; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
-const statusFlow: SanketStatus[] = ['incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
+const statusFlow: SanketStatus[] = ['submitted', 'incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
+const nextStatusMap: Partial<Record<SanketStatus, SanketStatus>> = {
+  submitted: 'incoming',
+  incoming: 'under_review',
+  assigned: 'in_progress',
+  in_progress: 'resolved',
+  resolved: 'closed',
+}
 
 const defaultDraft: SanketReportDraft = {
   reportType: 'incident',
@@ -61,27 +69,50 @@ const defaultDraft: SanketReportDraft = {
     phone: '',
     contactPreference: 'phone',
   },
+  reportedImpacts: {
+    peopleAffected: null,
+    reportedInjuries: null,
+    vulnerablePeople: null,
+    peopleTrapped: null,
+  },
   assistanceNeeds: ['food_water'],
   summary: '',
   details: '',
+}
+
+async function loadReports(role: 'victim' | 'helper', selectedId: string | null) {
+  const reports = role === 'helper'
+    ? await reportRepository.listHelperQueue()
+    : await reportRepository.listVictimReports()
+  const selected = reports.find((report) => report.id === selectedId) ?? reports[0] ?? null
+  const selectedDetails = role === 'helper' && selected
+    ? await reportRepository.getReport(selected.id)
+    : selected
+  return { reports, selected: selectedDetails }
 }
 
 function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
   const [draft, setDraft] = useState<SanketReportDraft>(defaultDraft)
   const [validationError, setValidationError] = useState('')
   const [submittedReportId, setSubmittedReportId] = useState('')
-  const [reports, setReports] = useState(reportStore.getAll())
+  const [reports, setReports] = useState<SanketReport[]>([])
+  const [selectedReport, setSelectedReport] = useState<SanketReport | null>(null)
+  const [revealedContact, setRevealedContact] = useState<SanketReport['reporter'] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [helperStatusFilter, setHelperStatusFilter] = useState<'all' | SanketStatus>('all')
   const [helperUrgencyFilter, setHelperUrgencyFilter] = useState<'all' | SanketUrgency>('all')
   const [helperCategoryFilter, setHelperCategoryFilter] = useState<'all' | SanketCategory>('all')
   const [helperAssignedFilter, setHelperAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all')
   const [helperLocationFilter, setHelperLocationFilter] = useState('')
   const [citizenView, setCitizenView] = useState<'report' | 'assistance' | 'history'>('report')
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(reportStore.getAll()[0]?.id ?? null)
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+
+  const previewQueue = reports.slice(0, 4)
 
   const helperQueue = useMemo(() => {
-    const all = reports.length > 0 ? reportStore.getQueue() : []
-    return all.filter((report) => {
+    return reports.filter((report) => {
       const statusMatches = helperStatusFilter === 'all' || report.status === helperStatusFilter
       const urgencyMatches = helperUrgencyFilter === 'all' || report.urgency === helperUrgencyFilter
       const categoryMatches = helperCategoryFilter === 'all' || report.category === helperCategoryFilter
@@ -98,12 +129,22 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
     })
   }, [helperAssignedFilter, helperCategoryFilter, helperLocationFilter, helperStatusFilter, helperUrgencyFilter, reports])
 
-  const selectedReport = useMemo(
-    () => reports.find((report) => report.id === selectedReportId) ?? helperQueue[0] ?? reports[0] ?? null,
-    [helperQueue, reports, selectedReportId],
-  )
-
-  const previewQueue = useMemo(() => [...reports].slice(0, 3), [reports])
+  useEffect(() => {
+    let active = true
+    void loadReports(role, null).then(({ reports: nextReports, selected }) => {
+      if (!active) return
+      setReports(nextReports)
+      setSelectedReport(selected)
+      setRevealedContact(null)
+      setSelectedReportId(selected?.id ?? null)
+      setLoading(false)
+    }).catch((error: unknown) => {
+      if (!active) return
+      setLoadError(error instanceof Error ? error.message : 'Reports could not be loaded.')
+      setLoading(false)
+    })
+    return () => { active = false }
+  }, [role])
 
   function updateDraft<K extends keyof SanketReportDraft>(key: K, value: SanketReportDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -120,6 +161,16 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
     setDraft((current) => ({
       ...current,
       reporter: { ...current.reporter, [key]: value },
+    }))
+  }
+
+  function updateReportedImpact<K extends keyof SanketReportDraft['reportedImpacts']>(
+    key: K,
+    value: SanketReportDraft['reportedImpacts'][K],
+  ) {
+    setDraft((current) => ({
+      ...current,
+      reportedImpacts: { ...current.reportedImpacts, [key]: value },
     }))
   }
 
@@ -145,15 +196,15 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
     return ''
   }
 
-  function refreshReports() {
-    const next = reportStore.getAll()
-    setReports(next)
-    if (selectedReportId && !next.some((report) => report.id === selectedReportId)) {
-      setSelectedReportId(next[0]?.id ?? null)
-    }
+  async function refreshReports(preferredId = selectedReportId) {
+    const result = await loadReports(role, preferredId)
+    setReports(result.reports)
+    setSelectedReport(result.selected)
+    setRevealedContact(null)
+    setSelectedReportId(result.selected?.id ?? null)
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const error = validateDraft()
     if (error) {
@@ -161,46 +212,91 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
       return
     }
 
-    const newReport = reportStore.add(draft)
-    setSubmittedReportId(newReport.id)
-    setValidationError('')
-    setCitizenView('history')
-    refreshReports()
-    setDraft({ ...defaultDraft, reportType: draft.reportType, urgency: draft.urgency })
+    setActionBusy(true)
+    setLoadError('')
+    try {
+      const newReport = await reportRepository.createReport(draft)
+      setSubmittedReportId(newReport.id)
+      setValidationError('')
+      setCitizenView('history')
+      setReports((current) => [newReport, ...current.filter((report) => report.id !== newReport.id)])
+      setSelectedReport(newReport)
+      setSelectedReportId(newReport.id)
+      setRevealedContact(null)
+      setDraft({ ...defaultDraft, reportType: draft.reportType, urgency: draft.urgency })
+      try {
+        await refreshReports(newReport.id)
+      } catch (refreshError) {
+        const reason = refreshError instanceof Error ? refreshError.message : 'Refresh failed.'
+        setLoadError(`Report ${newReport.id} was submitted, but report history could not be refreshed: ${reason}`)
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Report could not be submitted.')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  function handleHelperStatus(status: SanketStatus, note?: string) {
+  async function handleHelperStatus(status: SanketStatus, note?: string) {
     if (!selectedReport) return
-    const next = reportStore.updateStatus(selectedReport.id, status, 'Helper workflow', note)
-    if (!next) return
-    refreshReports()
+    setActionBusy(true)
+    setLoadError('')
+    try {
+      await reportRepository.updateStatus(selectedReport.id, status, note)
+      await refreshReports(selectedReport.id)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Status could not be updated.')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  function handleAssignment() {
+  async function handleAssignment() {
     if (!selectedReport) return
-    const next = reportStore.assignReport(selectedReport.id, 'Helper M. Rao', 'Assigned from prototype helper queue.')
-    if (!next) return
-    refreshReports()
+    setActionBusy(true)
+    setLoadError('')
+    try {
+      await reportRepository.assignReport(selectedReport.id, 'Assigned to the signed-in helper.')
+      await refreshReports(selectedReport.id)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Report could not be assigned.')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  const allowedStatuses = selectedReport ? statusFlow.slice(statusFlow.indexOf(selectedReport.status) + 1) : []
+  async function handleRevealContact() {
+    if (!selectedReport) return
+    setActionBusy(true)
+    setLoadError('')
+    try {
+      const contact = await reportRepository.getReportContact(selectedReport.id)
+      setRevealedContact(contact)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Contact details are unavailable.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const nextAction = selectedReport ? nextStatusMap[selectedReport.status] : undefined
 
   if (role === 'helper') {
-    const nextStatus = allowedStatuses[0]
-
     return (
       <DashboardLayout role={role} title="SANKET" description="Incoming citizen reports and triage workflow." eyebrow={`${role.toUpperCase()} MODULE / SANKET`}>
         <div className="sanket-page helper-workflow">
           <section className="sanket-topbar">
             <div>
-              <p className="eyebrow">HELPER REVIEW / PROTOTYPE</p>
+              <p className="eyebrow">{isSupabaseConfigured ? 'HELPER REVIEW / SUPABASE BACKEND' : 'HELPER REVIEW / LOCAL PREVIEW'}</p>
               <h2>Incident queue and triage</h2>
             </div>
             <div className="sanket-status">
               <span className="status-dot status-warning" />
-              Prototype workflow
+              {loading ? 'Refreshing queue…' : isSupabaseConfigured ? 'Supabase-backed queue' : 'Local-only prototype'}
             </div>
           </section>
+
+          {loadError && <p className="form-message" role="alert">{loadError}</p>}
 
           <div className="helper-layout">
             <aside className="sanket-panel helper-queue-panel">
@@ -249,7 +345,11 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                       key={report.id}
                       type="button"
                       className={`queue-item ${selectedReport?.id === report.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedReportId(report.id)}
+                      onClick={() => {
+                        setSelectedReportId(report.id)
+                        setSelectedReport(report)
+                        setRevealedContact(null)
+                      }}
                     >
                       <div className="queue-topline">
                         <span className="queue-id">{report.id}</span>
@@ -277,7 +377,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                       <p className="eyebrow">REPORT REVIEW</p>
                       <h3>{selectedReport.id}</h3>
                     </div>
-                    <span className="status-badge status-badge--submitted">{formatStatus(selectedReport.status)}</span>
+                    <span className={`status-badge status-badge--${selectedReport.status}`}>{formatStatus(selectedReport.status)}</span>
                   </div>
 
                   <div className="detail-body">
@@ -296,13 +396,27 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                         <p><strong>Summary:</strong> {selectedReport.summary}</p>
                         <p><strong>Details:</strong> {selectedReport.details}</p>
                         <p><strong>Assistance needed:</strong> {selectedReport.assistanceNeeds.length ? selectedReport.assistanceNeeds.map((item) => item.replace(/_/g, ' ')).join(', ') : 'None specified'}</p>
+                        <p><strong>People affected:</strong> {selectedReport.reportedImpacts.peopleAffected ?? 'Unknown'}</p>
+                        <p><strong>Reported injuries:</strong> {selectedReport.reportedImpacts.reportedInjuries ?? 'Unknown'}</p>
+                        <p><strong>Vulnerable people:</strong> {selectedReport.reportedImpacts.vulnerablePeople ?? 'Unknown'}</p>
+                        <p><strong>People trapped:</strong> {selectedReport.reportedImpacts.peopleTrapped ?? 'Unknown'}</p>
                       </section>
 
                       <section className="detail-card">
                         <h4>Reporter</h4>
-                        <div className="detail-row"><span>Name</span><strong>{selectedReport.reporter.name}</strong></div>
-                        <div className="detail-row"><span>Contact</span><strong>{selectedReport.reporter.phone || 'Not provided'}</strong></div>
-                        <div className="detail-row"><span>Preference</span><strong>{selectedReport.reporter.contactPreference}</strong></div>
+                        <div className="detail-row"><span>Name</span><strong>{revealedContact?.name ?? selectedReport.reporter.name}</strong></div>
+                        {revealedContact ? (
+                          <>
+                            <div className="detail-row"><span>Contact</span><strong>{revealedContact.phone}</strong></div>
+                            <div className="detail-row"><span>Preference</span><strong>{revealedContact.contactPreference}</strong></div>
+                          </>
+                        ) : selectedReport.canAccessContact ? (
+                          <Button type="button" variant="outline" disabled={actionBusy} onClick={handleRevealContact}>
+                            View contact details
+                          </Button>
+                        ) : (
+                          <div className="detail-row"><span>Contact</span><strong>Available to assigned helper only</strong></div>
+                        )}
                       </section>
 
                       <section className="detail-card">
@@ -318,7 +432,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                         <div className="detail-row"><span>Submitted</span><strong>{formatTimestamp(selectedReport.createdAt)}</strong></div>
                         <div className="detail-row"><span>Updated</span><strong>{formatTimestamp(selectedReport.updatedAt)}</strong></div>
                         <div className="detail-row"><span>Provenance</span><strong>{selectedReport.provenance.sourceLabel}</strong></div>
-                        <div className="detail-row"><span>Verification</span><strong>{selectedReport.location.source}</strong></div>
+                        <div className="detail-row"><span>Verification</span><strong>{selectedReport.verificationStatus}</strong></div>
                       </section>
 
                       <section className="detail-card">
@@ -336,21 +450,22 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                     </div>
 
                     <div className="action-stack">
-                      {!selectedReport.assignedTo ? (
-                        <Button type="button" className="button button-primary" onClick={handleAssignment}>Assign to me</Button>
-                      ) : (
+                      {selectedReport.status === 'under_review' && !selectedReport.assignedTo ? (
+                        <Button type="button" className="button button-primary" disabled={actionBusy} onClick={handleAssignment}>Assign to me</Button>
+                      ) : selectedReport.assignedTo ? (
                         <Button type="button" className="button button-outline" variant="outline" disabled>
                           Assigned to {selectedReport.assignedTo}
                         </Button>
-                      )}
-                      {nextStatus ? (
+                      ) : null}
+                      {nextAction ? (
                         <Button
                           type="button"
                           className="button button-outline"
                           variant="outline"
-                          onClick={() => handleHelperStatus(nextStatus, `Advanced to ${formatStatus(nextStatus)}`)}
+                          disabled={actionBusy}
+                          onClick={() => handleHelperStatus(nextAction, `Advanced to ${formatStatus(nextAction)}`)}
                         >
-                          Advance to {formatStatus(nextStatus)}
+                          Advance to {formatStatus(nextAction)}
                         </Button>
                       ) : null}
                     </div>
@@ -371,14 +486,16 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
       <div className="sanket-page sanket-victim-page">
         <section className="sanket-topbar">
           <div>
-            <p className="eyebrow">CITIZEN REPORTING / PROTOTYPE</p>
+            <p className="eyebrow">{isSupabaseConfigured ? 'CITIZEN REPORTING / SUPABASE BACKEND' : 'CITIZEN REPORTING / LOCAL PREVIEW'}</p>
             <h2>Report and request help</h2>
           </div>
           <div className="sanket-status">
             <span className="status-dot status-warning" />
-            Prototype environment
+            {loading ? 'Loading…' : isSupabaseConfigured ? 'Supabase-backed storage · no live dispatch' : 'Local-only prototype'}
           </div>
         </section>
+
+        {loadError && <p className="form-message" role="alert">{loadError}</p>}
 
         <div className="victim-primary-actions">
           {[
@@ -417,12 +534,22 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
             </div>
 
             <div className="history-list">
+              {submittedReportId && (
+                <div className="confirmation-card" role="status">
+                  <CheckCircle2 size={24} aria-hidden="true" />
+                  <div>
+                    <p className="confirmation-label">Report received</p>
+                    <h4>{submittedReportId}</h4>
+                    <p>Status: {formatStatus('incoming')} · Your report has been accepted and added to the queue.</p>
+                  </div>
+                </div>
+              )}
               {reports.length ? (
                 reports.map((report) => (
                   <article className="history-row victim-history-row" key={report.id}>
                     <div className="history-topline">
                       <span className="history-id">{report.id}</span>
-                      <span className="status-badge status-badge--submitted">{formatStatus(report.status)}</span>
+                      <span className={`status-badge status-badge--${report.status}`}>{formatStatus(report.status)}</span>
                     </div>
                     <div className="history-body">
                       <div className="history-main">
@@ -524,6 +651,34 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                   </div>
                 </div>
 
+                <fieldset className="sanket-field-group impact-fields">
+                  <legend className="field-label">Reported impact (leave blank if unknown)</legend>
+                  {([
+                    ['peopleAffected', 'People affected'],
+                    ['reportedInjuries', 'Reported injuries'],
+                    ['vulnerablePeople', 'Vulnerable people'],
+                    ['peopleTrapped', 'People trapped'],
+                  ] as const).map(([key, label]) => (
+                    <label className="form-field" key={key} htmlFor={`impact-${key}`}>
+                      <span className="field-label">{label}</span>
+                      <Input
+                        id={`impact-${key}`}
+                        type="number"
+                        min={0}
+                        max={1000000}
+                        step={1}
+                        inputMode="numeric"
+                        placeholder="Unknown"
+                        value={draft.reportedImpacts[key] ?? ''}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          updateReportedImpact(key, value === '' ? null : Number(value))
+                        }}
+                      />
+                    </label>
+                  ))}
+                </fieldset>
+
                 <div className="sanket-field-group">
                   <Label className="field-label">Location</Label>
                   <div className="two-up">
@@ -578,7 +733,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
                 )}
 
                 <div className="sanket-actions">
-                  <Button type="submit" className="button button-primary">Submit report</Button>
+                  <Button type="submit" className="button button-primary" disabled={actionBusy}>{actionBusy ? 'Submitting…' : 'Submit report'}</Button>
                 </div>
               </form>
             </section>
@@ -612,12 +767,19 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
               <div className="mini-panel">
                 <div className="mini-panel-header">
                   <ShieldAlert size={15} aria-hidden="true" />
-                  <span>Prototype note</span>
+                  <span>{isSupabaseConfigured ? 'Service note' : 'Prototype note'}</span>
                 </div>
-                <ul>
-                  <li>Reports stay in the current browser session.</li>
-                  <li>No live dispatch is performed.</li>
-                </ul>
+                {isSupabaseConfigured ? (
+                  <ul>
+                    <li>Reports use the configured Supabase project when the required migrations are applied.</li>
+                    <li>No live dispatch is performed.</li>
+                  </ul>
+                ) : (
+                  <ul>
+                    <li>Reports stay in the current browser session.</li>
+                    <li>No live dispatch is performed.</li>
+                  </ul>
+                )}
               </div>
 
               <div className="mini-panel">

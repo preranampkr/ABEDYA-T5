@@ -1,0 +1,10 @@
+# Local Supabase CLI project identifier; this is not a remote project ref.
+project_id = "abhedya"
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+sql_paths = []

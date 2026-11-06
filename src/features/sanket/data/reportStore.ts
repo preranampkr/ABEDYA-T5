@@ -2,7 +2,7 @@ import { sampleReports } from './sampleReports.ts'
 import type { SanketReport, SanketReportDraft, SanketStatus, SanketStatusHistoryEntry, SanketUrgency } from '../types'
 
 const prototypeReports: SanketReport[] = [...sampleReports]
-const lifecycleOrder: SanketStatus[] = ['incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
+const lifecycleOrder: SanketStatus[] = ['submitted', 'incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
 
 const isValidTransition = (from: SanketStatus, to: SanketStatus) => {
   const fromIndex = lifecycleOrder.indexOf(from)
@@ -65,6 +65,7 @@ export const reportStore = {
       reporter: {
         ...reportDraft.reporter,
       },
+      reportedImpacts: { ...reportDraft.reportedImpacts },
       assistanceNeeds: reportDraft.assistanceNeeds,
       summary: reportDraft.summary,
       details: reportDraft.details,
@@ -81,6 +82,8 @@ export const reportStore = {
         sourceLabel: 'Prototype browser store',
         note: 'This frontend prototype does not send or store data on a live backend.',
       },
+      originKind: 'user_submission',
+      verificationStatus: 'unverified',
     }
 
     prototypeReports.unshift(newReport)
@@ -102,6 +105,7 @@ export const reportStore = {
 
     report.assignedTo = helperName
     report.status = 'assigned'
+    report.canAccessContact = true
     report.updatedAt = new Date().toISOString()
     appendStatusHistory(report, previousStatus, 'assigned', helperName, note ?? 'Assigned to a helper for follow-up.')
     return report
@@ -127,6 +131,15 @@ export const reportStore = {
     if (!report) return null
 
     report.urgency = urgency
+    report.updatedAt = new Date().toISOString()
+    return report
+  },
+
+  updateVerification(id: string, status: SanketReport['verificationStatus']) {
+    const report = prototypeReports.find((item) => item.id === id)
+    if (!report) return null
+
+    report.verificationStatus = status
     report.updatedAt = new Date().toISOString()
     return report
   },

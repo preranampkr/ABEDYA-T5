@@ -23,10 +23,12 @@ export const sampleReports: SanketReport[] = [
       phone: '+91 98765 43210',
       contactPreference: 'phone',
     },
+    reportedImpacts: { peopleAffected: null, reportedInjuries: null, vulnerablePeople: null, peopleTrapped: null },
     assistanceNeeds: ['food_water', 'rescue'],
     summary: 'Road near bus stand remains waterlogged after heavy rain.',
     details: 'Water is impeding access for pedestrians and riders. Residents are waiting for assistance.',
     assignedTo: 'Riya M.',
+    canAccessContact: true,
     assignmentHistory: [
       { from: 'submitted', to: 'incoming', at: '2026-10-31T08:12:00+05:30', by: 'Prototype queue', note: 'New report entered' },
       { from: 'incoming', to: 'under_review', at: '2026-10-31T08:15:00+05:30', by: 'Riya M.', note: 'Initial review completed' },
@@ -37,6 +39,8 @@ export const sampleReports: SanketReport[] = [
       sourceLabel: 'Prototype sample',
       note: 'Synthetic example data for interface development only.',
     },
+    originKind: 'demo',
+    verificationStatus: 'unverified',
   },
   {
     id: 'SNK-0002',
@@ -60,10 +64,12 @@ export const sampleReports: SanketReport[] = [
       phone: '+91 99887 66554',
       contactPreference: 'sms',
     },
+    reportedImpacts: { peopleAffected: null, reportedInjuries: null, vulnerablePeople: null, peopleTrapped: null },
     assistanceNeeds: ['medical', 'transport'],
     summary: 'Family needs urgent medical support and transportation to a clinic.',
     details: 'A resident is reporting a health concern and is unable to access a vehicle due to disrupted roads.',
     assignedTo: 'Aarav K.',
+    canAccessContact: true,
     assignmentHistory: [
       { from: 'submitted', to: 'incoming', at: '2026-10-31T09:06:00+05:30', by: 'Prototype queue', note: 'New report entered' },
       { from: 'incoming', to: 'under_review', at: '2026-10-31T09:09:00+05:30', by: 'Aarav K.', note: 'Urgency validated' },
@@ -74,6 +80,8 @@ export const sampleReports: SanketReport[] = [
       sourceLabel: 'Prototype sample',
       note: 'Synthetic example data for interface development only.',
     },
+    originKind: 'demo',
+    verificationStatus: 'unverified',
   },
 ]
 

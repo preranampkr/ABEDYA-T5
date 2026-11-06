@@ -4,12 +4,12 @@ import DashboardLayout from '../components/DashboardLayout'
 import ModuleCard from '../components/ModuleCard'
 import StatusIndicator from '../components/StatusIndicator'
 import { modulesByRole, roleLabels } from '../data/modules'
-import type { UserRole } from '../types/domain'
+import type { WorkspaceRole } from '../types/domain'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
 import { Button } from '../components/ui/button'
 
 interface DashboardPageProps {
-  role: UserRole
+  role: WorkspaceRole
 }
 
 function DashboardPage({ role }: DashboardPageProps) {

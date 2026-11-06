@@ -1,5 +1,6 @@
-export type UserRole = 'victim' | 'helper'
-export type AuthMode = 'login' | 'signup'
+export type WorkspaceRole = 'victim' | 'helper'
+export type UserRole = WorkspaceRole | 'admin'
+export type AuthMode = 'login' | 'signup' | 'password-reset' | 'update-password'
 
 export interface ModuleDefinition {
   id: string

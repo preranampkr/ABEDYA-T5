@@ -30,7 +30,9 @@ export type SanketAssistanceNeed =
   | 'transport'
   | 'other'
 
-export type SanketSourceMode = 'prototype' | 'demo' | 'live'
+export type SanketSourceMode = 'prototype' | 'demo' | 'live' | 'user_submission'
+export type SanketOriginKind = 'user_submission' | 'demo'
+export type SanketVerificationStatus = 'unverified' | 'verified' | 'disputed'
 
 export interface SanketLocation {
   label: string
@@ -48,12 +50,36 @@ export interface SanketReporter {
   contactPreference: 'phone' | 'sms' | 'voice' | 'none'
 }
 
+export interface SanketReportedImpacts {
+  peopleAffected: number | null
+  reportedInjuries: number | null
+  vulnerablePeople: number | null
+  peopleTrapped: number | null
+}
+
 export interface SanketStatusHistoryEntry {
-  from: SanketStatus
+  from: SanketStatus | null
   to: SanketStatus
   at: string
   by: string
   note?: string
+}
+
+export interface SanketAssignmentHistoryEntry {
+  helperId: string | null
+  helperName: string
+  assignedBy: string | null
+  assignedAt: string
+  endedAt: string | null
+  note?: string
+}
+
+export interface SanketOperationalNote {
+  id: string
+  authorId: string | null
+  note: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface SanketReport {
@@ -66,16 +92,22 @@ export interface SanketReport {
   updatedAt: string
   location: SanketLocation
   reporter: SanketReporter
+  reportedImpacts: SanketReportedImpacts
+  canAccessContact?: boolean
   assistanceNeeds: SanketAssistanceNeed[]
   summary: string
   details: string
   assignedTo?: string
   assignmentHistory: SanketStatusHistoryEntry[]
+  assignmentEvents?: SanketAssignmentHistoryEntry[]
+  operationalNotes?: SanketOperationalNote[]
   provenance: {
     sourceMode: SanketSourceMode
     sourceLabel: string
     note: string
   }
+  originKind: SanketOriginKind
+  verificationStatus: SanketVerificationStatus
 }
 
 export interface SanketReportDraft {
@@ -96,6 +128,7 @@ export interface SanketReportDraft {
     phone: string
     contactPreference: 'phone' | 'sms' | 'voice' | 'none'
   }
+  reportedImpacts: SanketReportedImpacts
   assistanceNeeds: SanketAssistanceNeed[]
   summary: string
   details: string

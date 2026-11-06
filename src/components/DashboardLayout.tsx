@@ -1,7 +1,11 @@
-import { ArrowUpRight, LayoutDashboard } from 'lucide-react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { ArrowUpRight, LayoutDashboard, LogOut } from 'lucide-react'
+import { useState } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../app/AuthContext'
+import { isSupabaseConfigured } from '../lib/supabase'
+import { disableLocalPreview, isLocalPreviewEnabled } from '../lib/localPreview'
 import { modulesByRole, roleLabels } from '../data/modules'
-import type { UserRole } from '../types/domain'
+import type { WorkspaceRole } from '../types/domain'
 import Brand from './Brand'
 import PageHeader from './PageHeader'
 import { Button } from './ui/button'
@@ -23,7 +27,7 @@ import {
 } from './ui/sidebar'
 
 interface DashboardLayoutProps {
-  role: UserRole
+  role: WorkspaceRole
   title: string
   description: string
   eyebrow?: string
@@ -32,7 +36,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode
 }
 
-function DashboardNavigation({ role }: { role: UserRole }) {
+function DashboardNavigation({ role }: { role: WorkspaceRole }) {
   const { pathname } = useLocation()
   const dashboardPath = `/${role}/dashboard`
 
@@ -62,6 +66,22 @@ function DashboardNavigation({ role }: { role: UserRole }) {
 }
 
 function DashboardLayout({ role, title, description, eyebrow, wide = false, hidePageHeader = false, children }: DashboardLayoutProps) {
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
+  const [signOutError, setSignOutError] = useState('')
+  const localPreview = !isSupabaseConfigured && isLocalPreviewEnabled()
+
+  async function handleSignOut() {
+    setSignOutError('')
+    try {
+      if (localPreview) disableLocalPreview()
+      await signOut()
+      navigate('/', { replace: true })
+    } catch {
+      setSignOutError('Unable to sign out. Please try again.')
+    }
+  }
+
   return (
     <SidebarProvider className="dashboard-layout">
       <Sidebar className="dashboard-sidebar">
@@ -81,8 +101,9 @@ function DashboardLayout({ role, title, description, eyebrow, wide = false, hide
         </SidebarContent>
         <SidebarFooter className="dashboard-sidebar-footer">
           <SidebarSeparator />
-          <span className="sidebar-status"><span className="status-dot" /> Prototype environment</span>
-          <Link className="sidebar-switch" to="/roles">Switch role <ArrowUpRight size={14} aria-hidden="true" /></Link>
+          <span className="sidebar-status"><span className="status-dot" /> {localPreview ? 'Local-only preview' : 'Authenticated workspace'}</span>
+          {signOutError && <span role="alert">{signOutError}</span>}
+          <button className="sidebar-switch" type="button" onClick={handleSignOut}>Sign out <LogOut size={14} aria-hidden="true" /></button>
         </SidebarFooter>
       </Sidebar>
 
@@ -97,10 +118,10 @@ function DashboardLayout({ role, title, description, eyebrow, wide = false, hide
             <Link to="/">Emergency SOS <ArrowUpRight size={14} aria-hidden="true" /></Link>
           </Button>
         </header>
-        <main className={wide ? 'dashboard-content dashboard-content-wide' : 'dashboard-content'}>
+        <div className={wide ? 'dashboard-content dashboard-content-wide' : 'dashboard-content'}>
           {!hidePageHeader && <PageHeader eyebrow={eyebrow ?? `${roleLabels[role].toUpperCase()} WORKSPACE`} title={title} description={description} />}
           {children}
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

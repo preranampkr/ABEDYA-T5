@@ -21,9 +21,6 @@ function LandingPage() {
               <Button asChild className="button button-primary">
                 <Link to="/roles">Continue to platform <ArrowRight size={16} aria-hidden="true" /></Link>
               </Button>
-              <Button asChild className="button button-quiet" variant="secondary">
-                <Link to="/victim/dashboard">Development access <ArrowUpRight size={15} aria-hidden="true" /></Link>
-              </Button>
               <a className="button button-quiet" href="#emergency">
                 Open emergency SOS <ArrowUpRight size={15} aria-hidden="true" />
               </a>

@@ -4,13 +4,14 @@ import { Link, Navigate } from 'react-router-dom'
 import DashboardLayout from '../components/DashboardLayout'
 import StatusIndicator from '../components/StatusIndicator'
 import { modulesByRole } from '../data/modules'
-import type { UserRole } from '../types/domain'
+import type { WorkspaceRole } from '../types/domain'
 
 const DrishtiPage = lazy(() => import('../features/drishti/DrishtiPage'))
 const SanketPage = lazy(() => import('../features/sanket/SanketPage'))
+const MedhaPage = lazy(() => import('../features/medha/MedhaPage'))
 
 interface ModulePageProps {
-  role: UserRole
+  role: WorkspaceRole
   moduleId: string
 }
 
@@ -30,6 +31,14 @@ function ModulePage({ role, moduleId }: ModulePageProps) {
     return (
       <Suspense fallback={<div className="drishti-loading" role="status">Loading SANKET reporting workspace…</div>}>
         <SanketPage role={role} />
+      </Suspense>
+    )
+  }
+
+  if (moduleId === 'medha') {
+    return (
+      <Suspense fallback={<div className="drishti-loading" role="status">Loading MEDHA incident intelligence…</div>}>
+        <MedhaPage />
       </Suspense>
     )
   }

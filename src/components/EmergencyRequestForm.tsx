@@ -54,7 +54,10 @@ function EmergencyRequestForm() {
       return
     }
 
-    if (!formData.get('emergency-type')) return
+    if (!formData.get('emergency-type')) {
+      setNotice('Select an emergency type to simulate the SOS request.')
+      return
+    }
 
     setNotice('Simulation complete. No emergency services or rescue teams were contacted.')
   }
