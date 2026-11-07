@@ -223,3 +223,77 @@
   .drishti-timeline-control { grid-column: 1 / -1; grid-row: 2; }
   .drishti-timeline-time { min-width: 0; font-size: 7px; }
 }
+
+/* Emergency Distress Beacon Markers for Victims */
+.drishti-sos-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.drishti-sos-marker {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.drishti-sos-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(239, 143, 143, 0.5);
+  animation: drishti-gps-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.drishti-sos-dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #93000a;
+  border: 2px solid #ffb4ab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px #ffb4ab;
+  font-size: 11px;
+}
+
+.drishti-sos-marker-badge {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 22, 15, 0.9);
+  border: 1px solid #ffb4ab;
+  color: #ffdad6;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes drishti-gps-ping {
+  0% { transform: scale(0.9); opacity: 0.95; }
+  70% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(3.0); opacity: 0; }
+}
+
+.drishti-sos-popup .leaflet-popup-content-wrapper {
+  background: #111e17 !important;
+  border: 1px solid #ffb4ab !important;
+  border-radius: 8px !important;
+  color: #d6e7da !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+}
+
+.drishti-sos-popup .leaflet-popup-tip {
+  background: #111e17 !important;
+  border-color: #ffb4ab !important;
+}

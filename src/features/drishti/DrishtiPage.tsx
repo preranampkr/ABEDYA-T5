@@ -1,4 +1,5 @@
 import 'leaflet/dist/leaflet.css'
+import { divIcon } from 'leaflet'
 import {
   Activity,
   AlertTriangle,
@@ -13,13 +14,17 @@ import {
   ExternalLink,
   Info,
   Layers3,
+  LocateFixed,
   MapPinned,
   Navigation,
+  PhoneCall,
   ShieldAlert,
+  Siren,
   Waves,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { GeoJSON, MapContainer, ScaleControl, TileLayer, ZoomControl, useMap } from 'react-leaflet'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Circle, GeoJSON, MapContainer, Marker, Popup, ScaleControl, TileLayer, ZoomControl, useMap } from 'react-leaflet'
+import { Link } from 'react-router-dom'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
 import DashboardLayout from '../../components/DashboardLayout'
@@ -29,6 +34,8 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { reportRepository } from '../sanket/data/reportRepository'
+import type { EmergencyDispatchNotification } from '../sanket/types'
 import { drishtiProviders, taluks } from './data/providers'
 import type {
   DataMode,
@@ -49,9 +56,10 @@ type BoundaryProperties = Record<string, unknown> & {
 
 type DistrictBoundary = GeographicFeature<BoundaryProperties>
 type BoundaryCollection = { type: 'FeatureCollection'; features: DistrictBoundary[] }
-type SectionId = 'situation' | 'geospatial' | 'rainfall' | 'river' | 'risk' | 'alerts'
+type SectionId = 'emergencies' | 'situation' | 'geospatial' | 'rainfall' | 'river' | 'risk' | 'alerts'
 
 const sections: { id: SectionId; label: string; icon: typeof Activity; description: string }[] = [
+  { id: 'emergencies', label: 'Emergency Distress Signals', icon: Siren, description: 'Live tracked GPS locations of victims and SOS distress beacons.' },
   { id: 'situation', label: 'District Situation', icon: Activity, description: 'Current district-level status and source availability.' },
   { id: 'geospatial', label: 'Geospatial Intelligence', icon: Layers3, description: 'Boundary provenance, geography selection, and available map layers.' },
   { id: 'rainfall', label: 'Rainfall & Weather', icon: CloudRain, description: 'Rainfall and weather observations with source and freshness.' },
@@ -61,6 +69,7 @@ const sections: { id: SectionId; label: string; icon: typeof Activity; descripti
 ]
 
 const sectionTitles: Record<SectionId, string> = {
+  emergencies: 'Emergency Distress Signals (SOS Beacons)',
   situation: 'District Situation',
   geospatial: 'Geospatial Intelligence',
   rainfall: 'Rainfall & Weather',
@@ -94,14 +103,47 @@ function boundaryExtent(feature: DistrictBoundary): { center: LatLngTuple; bound
   }
 }
 
-function FitDistrict({ bounds }: { bounds: LatLngBoundsExpression }) {
+function MapViewController({
+  bounds,
+  flyTarget,
+}: {
+  bounds: LatLngBoundsExpression | null
+  flyTarget: LatLngTuple | null
+}) {
   const map = useMap()
 
   useEffect(() => {
-    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10 })
-  }, [bounds, map])
+    map.invalidateSize()
+  }, [map])
+
+  useEffect(() => {
+    if (flyTarget) {
+      map.flyTo(flyTarget, 14, { duration: 0.8 })
+    } else if (bounds) {
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10 })
+    }
+  }, [bounds, flyTarget, map])
 
   return null
+}
+
+function createSosMarkerIcon(victim: EmergencyDispatchNotification) {
+  const firstName = victim.reporter.name ? victim.reporter.name.split(' ')[0] : 'SOS'
+  return divIcon({
+    className: 'drishti-sos-div-icon',
+    html: `
+      <div class="drishti-sos-marker" title="${victim.reporter.name} - SOS Beacon">
+        <div class="drishti-sos-ping"></div>
+        <div class="drishti-sos-dot">
+          <span>🚨</span>
+        </div>
+        <span class="drishti-sos-marker-badge">${firstName}</span>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  })
 }
 
 function formatTime(value: string | undefined) {
@@ -197,6 +239,26 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
   const [historicalFloodDetail, setHistoricalFloodDetail] = useState('Historical flood dataset is unavailable.')
   const [timelineIndex, setTimelineIndex] = useState(0)
 
+  // Live Emergency Victim Locations
+  const [emergencyVictims, setEmergencyVictims] = useState<EmergencyDispatchNotification[]>(() =>
+    reportRepository.getEmergencyNotifications()
+  )
+  const [showEmergencyVictims, setShowEmergencyVictims] = useState(true)
+  const [flyTarget, setFlyTarget] = useState<LatLngTuple | null>(null)
+  const [newEmergencyAlert, setNewEmergencyAlert] = useState<EmergencyDispatchNotification | null>(null)
+
+  useEffect(() => {
+    // Real-time listener for emergency distress beacons
+    const unsubscribe = reportRepository.subscribeEmergency((notification) => {
+      setEmergencyVictims((current) => [notification, ...current.filter((n) => n.id !== notification.id)])
+      setNewEmergencyAlert(notification)
+      setShowEmergencyVictims(true)
+      const timer = setTimeout(() => setNewEmergencyAlert(null), 7000)
+      return () => clearTimeout(timer)
+    })
+    return unsubscribe
+  }, [])
+
   useEffect(() => {
     const controller = new AbortController()
 
@@ -248,9 +310,151 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
   }
 
   function renderSectionContent() {
+    if (activeSection === 'emergencies') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {emergencyVictims.length === 0 ? (
+            <div className="drishti-unavailable">
+              <Info size={16} aria-hidden="true" />
+              <div>
+                <strong>No Active Emergency Distress Signals</strong>
+                <p>No active civilian SOS beacons or critical priority incidents recorded in the district.</p>
+              </div>
+            </div>
+          ) : (
+            emergencyVictims.map((victim) => {
+              const lat = victim.location.latitude ?? 13.3408
+              const lon = victim.location.longitude ?? 74.7421
+              return (
+                <div
+                  key={victim.id}
+                  style={{
+                    background: 'var(--olive)',
+                    border: '1px solid rgba(255, 180, 171, 0.35)',
+                    borderRadius: '6px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <strong style={{ color: '#ffffff', fontSize: '13px' }}>{victim.reporter.name}</strong>
+                    <span style={{ background: '#93000a', color: '#ffdad6', fontSize: '9px', fontWeight: 800, padding: '1px 5px', borderRadius: '3px' }}>
+                      #{victim.reportId}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '11px', color: 'var(--sage)' }}>
+                    <strong>Locality:</strong> {victim.location.locality}, {victim.location.taluk}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)' }}>
+                    <LocateFixed size={12} />
+                    <span>GPS: {lat.toFixed(5)}° N, {lon.toFixed(5)}° E</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#ffb4ab' }}>
+                    {victim.summary}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      style={{ fontSize: '10px', height: '26px', padding: '0 8px' }}
+                      onClick={() => {
+                        setFlyTarget([lat, lon])
+                        setShowEmergencyVictims(true)
+                      }}
+                    >
+                      <LocateFixed size={12} style={{ marginRight: '4px' }} />
+                      Focus on Map
+                    </Button>
+                    <Link
+                      to={`/${role}/sanket?track=${victim.reportId}`}
+                      style={{
+                        background: 'var(--tactical)',
+                        color: '#08160f',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      Track
+                    </Link>
+                    {victim.reporter.phone && (
+                      <a
+                        href={`tel:${victim.reporter.phone}`}
+                        style={{
+                          background: 'rgba(245, 189, 88, 0.2)',
+                          border: '1px solid #f5bd58',
+                          color: '#f5bd58',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <PhoneCall size={12} />
+                        Call
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )
+    }
+
     if (activeSection === 'situation') {
       return (
         <>
+          {emergencyVictims.length > 0 && (
+            <div
+              style={{
+                background: 'rgba(147, 0, 10, 0.25)',
+                border: '1px solid #ffb4ab',
+                borderRadius: '6px',
+                padding: '8px 10px',
+                marginBottom: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Siren size={14} style={{ color: '#ffb4ab' }} />
+                <strong style={{ fontSize: '10px', color: '#ffdad6', fontFamily: 'var(--font-mono)' }}>
+                  {emergencyVictims.length} ACTIVE SOS VICTIM{emergencyVictims.length > 1 ? 'S' : ''}
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveSection('emergencies')}
+                style={{
+                  background: '#93000a',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                }}
+              >
+                VIEW LOCATIONS
+              </button>
+            </div>
+          )}
           {dataMode === 'demonstration' ? <ObservationValue rainfall={selectedRainfall} weather={demoWeather} /> : null}
           {liveMode && <UnavailablePanel title="Live observations unavailable" detail="No IMD, KSNDMC, or CWC observation feed is connected. Demonstration values are not substituted in this mode." />}
           {historicalMode && <UnavailablePanel title="Historical observations unavailable" detail="No verified station-level rainfall, weather, or river archive is connected." />}
@@ -407,6 +611,12 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
 
             <section className="drishti-control-section drishti-layers">
               <SectionHeading icon={Layers3} title="Map layers" index="03" />
+              <LayerToggle
+                checked={showEmergencyVictims}
+                label="Victim emergency beacons"
+                description={`Live GNSS distress positions (${emergencyVictims.length} active)`}
+                onChange={setShowEmergencyVictims}
+              />
               <LayerToggle checked={showBasemap} label="OpenStreetMap basemap" description="Roads, mapped rivers and water bodies" onChange={setShowBasemap} />
               <LayerToggle checked={showDistrictBoundary} label="Udupi district boundary" description="GeoBoundaries ADM2 · 2021" onChange={setShowDistrictBoundary} />
               <LayerToggle checked={false} disabled label="Current taluk boundaries" description="No aligned, verified dataset" />
@@ -422,26 +632,276 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
               <div><span className="drishti-map-live-dot" /><span>GEOSPATIAL VIEW</span><span className="drishti-map-separator">/</span><strong>{selectedGeography}</strong></div>
               <div className="drishti-map-toolbar-right"><span>BOUNDARY {boundaryState === 'ready' ? 'LOADED' : boundaryState.toUpperCase()}</span><ChevronDown size={14} aria-hidden="true" /></div>
             </div>
+
+            {/* Flash notification for newly received emergency lock */}
+            {newEmergencyAlert && (
+              <div
+                style={{
+                  background: '#93000a',
+                  borderBottom: '1px solid #ffb4ab',
+                  color: '#ffdad6',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  zIndex: 500,
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Siren size={16} />
+                  <span>🚨 NEW EMERGENCY SOS LOCK: {newEmergencyAlert.reporter.name} ({newEmergencyAlert.location.locality})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFlyTarget([newEmergencyAlert.location.latitude ?? 13.3408, newEmergencyAlert.location.longitude ?? 74.7421])
+                    setShowEmergencyVictims(true)
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    color: '#93000a',
+                    fontWeight: 800,
+                    border: 'none',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  FLY TO LOCATION
+                </button>
+              </div>
+            )}
+
+            {/* Live Emergency Victim Beacons Ticker / HUD */}
+            {emergencyVictims.length > 0 && (
+              <div
+                style={{
+                  background: 'linear-gradient(90deg, rgba(147, 0, 10, 0.88) 0%, rgba(8, 22, 15, 0.95) 100%)',
+                  borderBottom: '1px solid var(--accent-coral)',
+                  padding: '5px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                  zIndex: 400,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#ffb4ab',
+                      display: 'inline-block',
+                      boxShadow: '0 0 8px #ffb4ab',
+                    }}
+                  />
+                  <strong style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ffdad6', letterSpacing: '0.04em' }}>
+                    🚨 LIVE SOS BEACONS ({emergencyVictims.length} ACTIVE)
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {emergencyVictims.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        setFlyTarget([v.location.latitude ?? 13.3408, v.location.longitude ?? 74.7421])
+                        setShowEmergencyVictims(true)
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.12)',
+                        border: '1px solid #ffb4ab',
+                        color: '#ffdad6',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-mono)',
+                        padding: '2px 8px',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <LocateFixed size={11} />
+                      {v.reporter.name.split(' ')[0]}: {v.location.locality}
+                    </button>
+                  ))}
+                  {flyTarget && (
+                    <button
+                      type="button"
+                      onClick={() => setFlyTarget(null)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid var(--border)',
+                        color: 'var(--sage)',
+                        fontSize: '9px',
+                        fontFamily: 'var(--font-mono)',
+                        padding: '2px 6px',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      RESET VIEW
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="drishti-map-canvas">
               {boundaryState === 'loading' && <div className="drishti-map-state"><Database size={21} /><strong>Loading verified boundary</strong><span>Retrieving the local district reference file.</span></div>}
               {boundaryState === 'error' && <div className="drishti-map-state drishti-map-error"><AlertTriangle size={21} /><strong>District geometry unavailable</strong><span>{boundaryError}</span></div>}
               {boundaryState === 'ready' && boundary && mapExtent && (
                 <>
                   <MapContainer center={mapExtent.center} zoom={8} minZoom={7} maxZoom={15} scrollWheelZoom zoomControl={false} className="drishti-leaflet-map">
-                    <FitDistrict bounds={mapExtent.bounds} />
+                    <MapViewController bounds={mapExtent.bounds} flyTarget={flyTarget} />
                     {showBasemap && <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />}
                     {showDistrictBoundary && boundaryMapData && (
                       <GeoJSON
                         key={boundary.properties.shapeID}
                         data={boundaryMapData}
                         style={{ color: '#83B96B', weight: 2.5, fillColor: '#83B96B', fillOpacity: 0.06 }}
-                        eventHandlers={{ click: () => { setSelectedTaluk('all'); setSelectedGeography('Udupi District') } }}
+                        eventHandlers={{ click: () => { setSelectedTaluk('all'); setSelectedGeography('Udupi District'); setFlyTarget(null) } }}
                       />
                     )}
+
+                    {/* Live Emergency Victim Location Markers */}
+                    {showEmergencyVictims && emergencyVictims.map((victim) => {
+                      const lat = victim.location.latitude ?? 13.3408
+                      const lon = victim.location.longitude ?? 74.7421
+                      return (
+                        <Fragment key={`sos-${victim.id}`}>
+                          <Circle
+                            center={[lat, lon]}
+                            radius={victim.location.accuracy ? victim.location.accuracy * 10 : 150}
+                            pathOptions={{
+                              color: '#ffb4ab',
+                              fillColor: '#93000a',
+                              fillOpacity: 0.18,
+                              weight: 1.5,
+                              dashArray: '4, 4',
+                            }}
+                          />
+                          <Marker
+                            position={[lat, lon]}
+                            icon={createSosMarkerIcon(victim)}
+                          >
+                            <Popup className="drishti-sos-popup">
+                              <div style={{ minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#d6e7da' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 180, 171, 0.3)', paddingBottom: '4px' }}>
+                                  <span style={{ color: '#ffb4ab', fontWeight: 800, fontSize: '10px', fontFamily: 'monospace' }}>
+                                    🚨 PRIORITY-1 SOS BEACON
+                                  </span>
+                                  <span style={{ background: '#93000a', color: '#ffdad6', fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '3px' }}>
+                                    #{victim.reportId}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <h4 style={{ margin: '2px 0', fontSize: '13px', color: '#ffffff', fontWeight: 700 }}>
+                                    {victim.reporter.name}
+                                  </h4>
+                                  <p style={{ margin: '2px 0', fontSize: '11px', color: '#83b96b' }}>
+                                    <strong>Location:</strong> {victim.location.locality}, {victim.location.taluk}
+                                  </p>
+                                  <p style={{ margin: '2px 0', fontSize: '10px', color: '#c2c9b9', fontFamily: 'monospace' }}>
+                                    <strong>GPS:</strong> {lat.toFixed(5)}° N, {lon.toFixed(5)}° E
+                                  </p>
+                                  <p style={{ margin: '4px 0 2px', fontSize: '11px', color: '#ffd0cb' }}>
+                                    {victim.summary}
+                                  </p>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                  <Link
+                                    to={`/${role}/sanket?track=${victim.reportId}`}
+                                    style={{
+                                      background: '#83b96b',
+                                      color: '#08160f',
+                                      textDecoration: 'none',
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <LocateFixed size={12} />
+                                    Track in SANKET
+                                  </Link>
+
+                                  <a
+                                    href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      background: 'rgba(123, 208, 255, 0.2)',
+                                      border: '1px solid #7bd0ff',
+                                      color: '#7bd0ff',
+                                      textDecoration: 'none',
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <Navigation size={12} />
+                                    Directions
+                                  </a>
+
+                                  {victim.reporter.phone && (
+                                    <a
+                                      href={`tel:${victim.reporter.phone}`}
+                                      style={{
+                                        background: 'rgba(245, 189, 88, 0.2)',
+                                        border: '1px solid #f5bd58',
+                                        color: '#f5bd58',
+                                        textDecoration: 'none',
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      <PhoneCall size={12} />
+                                      Call
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        </Fragment>
+                      )
+                    })}
+
                     <ZoomControl position="bottomright" />
                     <ScaleControl imperial={false} position="bottomleft" />
                   </MapContainer>
                   <div className="drishti-map-key" aria-label="Map legend">
+                    {showEmergencyVictims && emergencyVictims.length > 0 && (
+                      <span style={{ color: '#ffb4ab', fontWeight: 700 }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#93000a', border: '1px solid #ffb4ab', display: 'inline-block' }} />
+                        🚨 Victim Emergency ({emergencyVictims.length})
+                      </span>
+                    )}
                     <span><i className="map-key-boundary" />Verified district outline</span>
                     <span><i className="map-key-basemap" />OSM mapped hydrography</span>
                   </div>
