@@ -22,8 +22,8 @@ export const modulesByRole: Record<WorkspaceRole, ModuleDefinition[]> = {
     {
       id: 'punarjeev',
       name: 'PUNARJEEV',
-      summary: 'Relief and recovery assistance.',
-      purpose: 'A future home for recovery resources and relief coordination.',
+      summary: 'Relief shelters, Bandhu family safe check-in, and rehabilitation claims.',
+      purpose: 'Locate open relief shelters, register safe check-in for separated kin, and submit disaster compensation claims.',
       path: '/victim/punarjeev',
       icon: HeartHandshake,
     },
@@ -64,8 +64,8 @@ export const modulesByRole: Record<WorkspaceRole, ModuleDefinition[]> = {
     {
       id: 'punarjeev',
       name: 'PUNARJEEV',
-      summary: 'Relief and recovery coordination.',
-      purpose: 'A future workspace for coordinating relief resources and recovery support.',
+      summary: 'Relief camp capacities, safe check-in registry, logistics & rehabilitation.',
+      purpose: 'Manage shelter occupancy, verify displaced persons, track supply requisitions, and review rehabilitation claims.',
       path: '/helper/punarjeev',
       icon: HeartHandshake,
     },
