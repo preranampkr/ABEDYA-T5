@@ -57,7 +57,7 @@ export const modulesByRole: Record<WorkspaceRole, ModuleDefinition[]> = {
       id: 'sena',
       name: 'SENA',
       summary: 'Incident review and response coordination.',
-      purpose: 'A future coordination workspace for reviewing reports and organizing response.',
+      purpose: 'Authoritative dispatch, team mobilization, and field operation coordination for verified incidents.',
       path: '/helper/sena',
       icon: Users,
     },

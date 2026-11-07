@@ -9,6 +9,7 @@ import type { WorkspaceRole } from '../types/domain'
 const DrishtiPage = lazy(() => import('../features/drishti/DrishtiPage'))
 const SanketPage = lazy(() => import('../features/sanket/SanketPage'))
 const MedhaPage = lazy(() => import('../features/medha/MedhaPage'))
+const SenaPage = lazy(() => import('../features/sena/SenaPage'))
 
 interface ModulePageProps {
   role: WorkspaceRole
@@ -39,6 +40,14 @@ function ModulePage({ role, moduleId }: ModulePageProps) {
     return (
       <Suspense fallback={<div className="drishti-loading" role="status">Loading MEDHA incident intelligence…</div>}>
         <MedhaPage />
+      </Suspense>
+    )
+  }
+
+  if (moduleId === 'sena') {
+    return (
+      <Suspense fallback={<div className="drishti-loading" role="status">Loading SENA response coordination…</div>}>
+        <SenaPage />
       </Suspense>
     )
   }

@@ -1,0 +1,582 @@
+.sena-workspace {
+  display: grid;
+  gap: 16px;
+  color: var(--paper);
+}
+
+.sena-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  background: var(--forest);
+}
+
+.sena-topbar h2 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.sena-topbar p {
+  margin: 4px 0 0;
+  color: var(--sage);
+  font-size: 12px;
+}
+
+.sena-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sena-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sena-metric-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  background: var(--forest);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sena-metric-card span:first-child {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sage);
+  font-weight: 600;
+}
+
+.sena-metric-card strong {
+  font-size: 24px;
+  font-family: var(--font-display);
+  color: var(--paper);
+}
+
+.sena-metric-card.critical strong {
+  color: var(--red);
+}
+
+.sena-metric-card.active strong {
+  color: var(--amber);
+}
+
+.sena-metric-card.ready strong {
+  color: var(--tactical);
+}
+
+/* Main Grid Layout */
+.sena-grid-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr 380px;
+  gap: 16px;
+  min-height: 640px;
+}
+
+.sena-panel {
+  border: 1px solid var(--border);
+  background: var(--forest);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sena-panel-header {
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sena-panel-header h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--paper);
+}
+
+.sena-panel-header .badge {
+  font-size: 10px;
+  padding: 2px 7px;
+}
+
+/* Incident Queue */
+.sena-filter-box {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.sena-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--olive);
+  border: 1px solid var(--border);
+  color: var(--paper);
+  font-size: 12px;
+}
+
+.sena-filter-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sena-pill-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: var(--olive);
+  border: 1px solid var(--border);
+  color: var(--sage);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sena-pill-btn:hover {
+  color: var(--paper);
+  border-color: var(--tactical);
+}
+
+.sena-pill-btn.active {
+  background: var(--panel);
+  color: var(--paper);
+  border-color: var(--tactical);
+  font-weight: 600;
+}
+
+.sena-incident-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 700px;
+}
+
+.sena-incident-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--olive);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.sena-incident-card:hover {
+  border-color: var(--tactical);
+  background: rgba(107, 209, 141, 0.04);
+}
+
+.sena-incident-card.selected {
+  border-color: var(--tactical);
+  outline: 1px solid var(--tactical);
+  background: rgba(107, 209, 141, 0.08);
+}
+
+.sena-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sena-card-id {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--sage);
+}
+
+.sena-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--paper);
+}
+
+.sena-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--sage);
+}
+
+.sena-needs-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sena-need-tag {
+  font-size: 9px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--sage);
+  text-transform: uppercase;
+}
+
+.sena-dispatch-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: fit-content;
+}
+
+.sena-dispatch-badge.pending_dispatch {
+  background: rgba(217, 164, 65, 0.15);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.sena-dispatch-badge.dispatched,
+.sena-dispatch-badge.en_route {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.sena-dispatch-badge.on_scene,
+.sena-dispatch-badge.operation_underway {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: #a855f7;
+  color: #c084fc;
+}
+
+.sena-dispatch-badge.resolved {
+  background: rgba(107, 209, 141, 0.15);
+  border-color: var(--tactical);
+  color: var(--tactical);
+}
+
+/* Map area */
+.sena-map-panel {
+  position: relative;
+  min-height: 520px;
+}
+
+.sena-map-wrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+}
+
+.sena-leaflet-map {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  background: #111a14;
+}
+
+/* Map Pins */
+.sena-map-pin {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+.sena-pin-critical {
+  background: #d94a4a;
+}
+
+.sena-pin-high {
+  background: #d9a441;
+}
+
+.sena-pin-medium {
+  background: #38bdf8;
+}
+
+.sena-pin-low {
+  background: #829182;
+}
+
+.sena-pin-selected {
+  outline: 3px solid #83b96b;
+  outline-offset: 2px;
+}
+
+.sena-pin-pulse {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(217, 74, 74, 0.4);
+  animation: sena-pulse 1.8s infinite;
+}
+
+@keyframes sena-pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.sena-unit-marker {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  background: #17251d;
+  border: 2px solid #83b96b;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.sena-unit-marker.sena-unit-avail {
+  border-color: #83b96b;
+  color: #83b96b;
+}
+
+.sena-unit-marker.sena-unit-busy {
+  border-color: #d9a441;
+  color: #d9a441;
+}
+
+/* Detail & Dispatch Action Panel */
+.sena-detail-scroll {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sena-incident-summary-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--olive);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sena-provenance-box {
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid var(--tactical);
+  font-size: 11px;
+  color: var(--sage);
+}
+
+.sena-provenance-box strong {
+  color: var(--paper);
+}
+
+.sena-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 11px;
+}
+
+.sena-impact-item {
+  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.sena-impact-item strong {
+  display: block;
+  font-size: 14px;
+  color: var(--paper);
+}
+
+/* Dispatch Assignment Box */
+.sena-dispatch-section {
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sena-dispatch-section h4 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sena-unit-select-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sena-unit-option-card {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--olive);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+.sena-unit-option-card:hover {
+  border-color: var(--tactical);
+}
+
+.sena-unit-option-card.chosen {
+  border-color: var(--tactical);
+  background: rgba(107, 209, 141, 0.08);
+  font-weight: 600;
+}
+
+.sena-unit-match-score {
+  font-size: 10px;
+  padding: 2px 5px;
+  background: rgba(107, 209, 141, 0.15);
+  color: var(--tactical);
+  border: 1px solid var(--tactical);
+}
+
+.sena-textarea {
+  width: 100%;
+  padding: 8px;
+  background: var(--olive);
+  border: 1px solid var(--border);
+  color: var(--paper);
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+/* Timeline & Field Logs */
+.sena-timeline-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sena-log-entry {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--olive);
+  font-size: 11px;
+}
+
+.sena-log-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--sage);
+  margin-bottom: 4px;
+}
+
+.sena-stage-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sena-stage-btn {
+  padding: 5px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--paper);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sena-stage-btn:hover {
+  border-color: var(--tactical);
+  background: var(--forest);
+}
+
+.sena-popup-content h4 {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  color: #17251d;
+}
+
+.sena-popup-content p {
+  margin: 2px 0;
+  font-size: 11px;
+  color: #334155;
+}
+
+.sena-popup-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sena-popup-tag.priority-critical {
+  background: #d94a4a;
+  color: #fff;
+}
+
+.sena-popup-tag.priority-high {
+  background: #d9a441;
+  color: #17251d;
+}
+
+.sena-popup-tag.unit-tag {
+  background: #22372b;
+  color: #83b96b;
+}
+
+.sena-popup-select-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  background: #17251d;
+  color: #83b96b;
+  border: 1px solid #405545;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .sena-grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .sena-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
