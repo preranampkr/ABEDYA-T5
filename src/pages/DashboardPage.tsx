@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
   BatteryCharging,
   Bed,
   CheckCircle2,
+  LocateFixed,
   MapPin,
+  Navigation,
+  PhoneCall,
   Radio,
   Shield,
+  Siren,
   Wifi,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -18,7 +22,7 @@ import { Button } from '../components/ui/button'
 import { modulesByRole, roleLabels } from '../data/modules'
 import { punarjeevStore } from '../features/punarjeev/data/punarjeevStore'
 import { reportRepository } from '../features/sanket/data/reportRepository'
-import type { SanketReportDraft } from '../features/sanket/types'
+import type { EmergencyDispatchNotification, SanketReportDraft } from '../features/sanket/types'
 import SosBeacon, { type GeoTrackedCoords } from '../features/sanket/SosBeacon'
 import { senaStore } from '../features/sena/data/senaStore'
 import type { WorkspaceRole } from '../types/domain'
@@ -48,6 +52,23 @@ export default function DashboardPage({ role }: DashboardPageProps) {
   })
   const [camps] = useState(() => punarjeevStore.getCamps())
   const nearestCamp = camps[0]
+
+  // Live Emergency Dispatch Notifications for Helpers
+  const [emergencyDispatches, setEmergencyDispatches] = useState<EmergencyDispatchNotification[]>(() =>
+    reportRepository.getEmergencyNotifications().filter((n) => !n.acknowledged)
+  )
+
+  useEffect(() => {
+    const unsub = reportRepository.subscribeEmergency((notification) => {
+      setEmergencyDispatches((cur) => [notification, ...cur.filter((n) => n.id !== notification.id)])
+    })
+    return unsub
+  }, [])
+
+  const handleAcknowledgeDispatch = (id: string) => {
+    reportRepository.acknowledgeEmergency(id, 'EOC Helper Team')
+    setEmergencyDispatches((cur) => cur.filter((n) => n.id !== id))
+  }
 
   const handleTriggerSos = async (
     threat: 'flood' | 'collapse' | 'medical' | 'trapped',
@@ -350,6 +371,192 @@ export default function DashboardPage({ role }: DashboardPageProps) {
                 CRIT-4
               </span>
             </div>
+
+            {/* Live Emergency SOS Dispatches */}
+            {emergencyDispatches.length > 0 && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(147, 0, 10, 0.45) 0%, rgba(8, 22, 15, 0.95) 100%)',
+                  border: '1px solid var(--accent-coral)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 4px 20px rgba(147, 0, 10, 0.25)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: 'var(--accent-coral)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 0 12px var(--accent-coral)',
+                      }}
+                    >
+                      <Siren size={18} style={{ color: '#04110a' }} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: '#ffdad6', letterSpacing: '0.04em', display: 'block' }}>
+                        PRIORITY-1 EMERGENCY DISPATCH: LIVE SOS BEACON ACTIVE
+                      </strong>
+                      <span style={{ fontSize: '11px', color: '#ffb4ab' }}>
+                        {emergencyDispatches.length} civilian distress signal{emergencyDispatches.length > 1 ? 's' : ''} received · Location tracking enabled
+                      </span>
+                    </div>
+                  </div>
+                  <Badge variant="destructive" style={{ background: '#93000a', color: '#ffdad6', border: '1px solid #ffb4ab', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                    ● LIVE GPS DISPATCH
+                  </Badge>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {emergencyDispatches.map((dispatch) => {
+                    const lat = dispatch.location.latitude ?? 13.3408
+                    const lon = dispatch.location.longitude ?? 74.7421
+                    const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
+                    return (
+                      <div
+                        key={dispatch.id}
+                        style={{
+                          background: 'rgba(4, 17, 10, 0.8)',
+                          border: '1px solid rgba(255, 180, 171, 0.35)',
+                          borderRadius: '8px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '240px', flex: '1' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800, color: 'var(--paper)', fontSize: '13px' }}>{dispatch.reporter.name}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent-sky)' }}>#{dispatch.reportId}</span>
+                            <span
+                              style={{
+                                background: 'rgba(239, 143, 143, 0.2)',
+                                color: 'var(--accent-coral)',
+                                fontSize: '9px',
+                                fontWeight: 800,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              {dispatch.threat}
+                            </span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '12px', color: 'var(--sage)' }}>
+                            <strong>Locality:</strong> {dispatch.location.locality || 'Locality unverified'}, {dispatch.location.taluk} · <strong>Situation:</strong> {dispatch.summary}
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <LocateFixed size={12} />
+                              GPS: {lat.toFixed(4)}° N, {lon.toFixed(4)}° E
+                            </span>
+                            {dispatch.reporter.phone && (
+                              <span style={{ color: 'var(--sage)' }}>
+                                TEL: {dispatch.reporter.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <Link
+                            to={`/helper/sanket?track=${dispatch.reportId}`}
+                            style={{
+                              background: 'var(--tactical)',
+                              color: '#04110a',
+                              textDecoration: 'none',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '7px 12px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <LocateFixed size={14} />
+                            TRACK IN SANKET
+                          </Link>
+
+                          <a
+                            href={navUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              background: 'rgba(123, 208, 255, 0.15)',
+                              border: '1px solid var(--accent-sky)',
+                              color: 'var(--accent-sky)',
+                              textDecoration: 'none',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '7px 12px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            <Navigation size={14} />
+                            GPS NAV
+                          </a>
+
+                          {dispatch.reporter.phone && (
+                            <a
+                              href={`tel:${dispatch.reporter.phone}`}
+                              style={{
+                                background: 'rgba(245, 189, 88, 0.15)',
+                                border: '1px solid var(--accent-amber)',
+                                color: 'var(--accent-amber)',
+                                textDecoration: 'none',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '7px 12px',
+                                borderRadius: '6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              <PhoneCall size={14} />
+                              CALL
+                            </a>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleAcknowledgeDispatch(dispatch.id)}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              color: 'var(--paper)',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '7px 12px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            DISMISS
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* EOC Key Metrics Bento Grid */}
             <div

@@ -83,6 +83,45 @@ export const sampleReports: SanketReport[] = [
     originKind: 'demo',
     verificationStatus: 'unverified',
   },
+  {
+    id: 'SNK-9101',
+    reportType: 'sos',
+    category: 'flooding',
+    urgency: 'critical',
+    status: 'incoming',
+    createdAt: '2026-10-31T09:25:00+05:30',
+    updatedAt: '2026-10-31T09:25:00+05:30',
+    location: {
+      label: 'Basrur Coastal Belt',
+      locality: 'Basrur Road',
+      taluk: 'Kundapura',
+      district: 'Udupi',
+      latitude: 13.6352,
+      longitude: 74.7088,
+      source: 'device',
+    },
+    reporter: {
+      name: 'Suresh Bhat',
+      phone: '+91 98451 23456',
+      contactPreference: 'phone',
+    },
+    reportedImpacts: { peopleAffected: 8, reportedInjuries: 1, vulnerablePeople: 2, peopleTrapped: 8 },
+    assistanceNeeds: ['rescue', 'evacuation', 'medical'],
+    summary: 'EMERGENCY SOS: 8 family members stranded on rooftop by surge water',
+    details: 'Flash flood level rose 5 feet rapidly. Current is strong. Family on second floor terrace. High-priority boat extraction requested.',
+    assignedTo: undefined,
+    canAccessContact: true,
+    assignmentHistory: [
+      { from: 'submitted', to: 'incoming', at: '2026-10-31T09:25:00+05:30', by: 'SOS Mesh Relay #04', note: 'Automated LoRa SOS zero-data beacon lock' },
+    ],
+    provenance: {
+      sourceMode: 'prototype',
+      sourceLabel: 'Tactical LoRa Mesh GPS',
+      note: 'Emergency distress beacon with high-precision GNSS lock.',
+    },
+    originKind: 'user_submission',
+    verificationStatus: 'unverified',
+  },
 ]
 
 export const sampleHelperQueue: SanketHelperQueueItem[] = sampleReports.map((report) => ({

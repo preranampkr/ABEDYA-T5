@@ -2,6 +2,7 @@ import { supabase } from '../../../lib/supabase'
 import { isLocalPreviewEnabled } from '../../../lib/localPreview'
 import { reportStore } from './reportStore'
 import type {
+  EmergencyDispatchNotification,
   SanketAssignmentHistoryEntry,
   SanketCategory,
   SanketOperationalNote,
@@ -270,5 +271,17 @@ export const reportRepository = {
     const { error } = await client.rpc('add_sanket_report_note', { p_report_id: id, p_note: note })
     if (error) throw error
     return fetchReportDetails(id)
+  },
+
+  getEmergencyNotifications(): EmergencyDispatchNotification[] {
+    return reportStore.getEmergencyNotifications()
+  },
+
+  subscribeEmergency(listener: (notification: EmergencyDispatchNotification) => void) {
+    return reportStore.subscribeEmergency(listener)
+  },
+
+  acknowledgeEmergency(id: string, helperName?: string) {
+    reportStore.acknowledgeEmergency(id, helperName)
   },
 }

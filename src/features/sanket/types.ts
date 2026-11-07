@@ -144,3 +144,27 @@ export interface SanketHelperQueueItem {
   createdAt: string
   reporterName: string
 }
+
+export interface EmergencyDispatchNotification {
+  id: string
+  reportId: string
+  timestamp: string
+  threat: string
+  summary: string
+  details: string
+  location: {
+    locality: string
+    taluk: string
+    district: string
+    latitude: number
+    longitude: number
+    accuracy?: number
+  }
+  reporter: {
+    name: string
+    phone: string
+  }
+  acknowledged: boolean
+  acknowledgedBy?: string
+  acknowledgedAt?: string
+}

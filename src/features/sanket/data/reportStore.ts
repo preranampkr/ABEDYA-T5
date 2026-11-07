@@ -1,8 +1,35 @@
 import { sampleReports } from './sampleReports.ts'
-import type { SanketReport, SanketReportDraft, SanketStatus, SanketStatusHistoryEntry, SanketUrgency } from '../types'
+import type { EmergencyDispatchNotification, SanketReport, SanketReportDraft, SanketStatus, SanketStatusHistoryEntry, SanketUrgency } from '../types'
 
 const prototypeReports: SanketReport[] = [...sampleReports]
 const lifecycleOrder: SanketStatus[] = ['submitted', 'incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
+
+const emergencyNotifications: EmergencyDispatchNotification[] = [
+  {
+    id: 'DISP-SNK-9101',
+    reportId: 'SNK-9101',
+    timestamp: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+    threat: 'flooding',
+    summary: 'EMERGENCY SOS: Flash flood trapped family and neighbors on roof',
+    details: 'Water entered houses reaching 5 feet. 8 people trapped on rooftop near Kundapura bridge. GNSS Fix active.',
+    location: {
+      locality: 'Basrur Road',
+      taluk: 'Kundapura',
+      district: 'Udupi',
+      latitude: 13.6352,
+      longitude: 74.7088,
+      accuracy: 8,
+    },
+    reporter: {
+      name: 'Suresh Bhat',
+      phone: '+91 98451 23456',
+    },
+    acknowledged: false,
+  },
+]
+
+type DispatchListener = (notification: EmergencyDispatchNotification) => void
+const dispatchListeners = new Set<DispatchListener>()
 
 const isValidTransition = (from: SanketStatus, to: SanketStatus) => {
   const fromIndex = lifecycleOrder.indexOf(from)
@@ -87,6 +114,39 @@ export const reportStore = {
     }
 
     prototypeReports.unshift(newReport)
+
+    if (reportDraft.reportType === 'sos' || reportDraft.urgency === 'critical') {
+      const notification: EmergencyDispatchNotification = {
+        id: `DISP-${newReport.id}`,
+        reportId: newReport.id,
+        timestamp: now,
+        threat: reportDraft.category,
+        summary: reportDraft.summary,
+        details: reportDraft.details,
+        location: {
+          locality: reportDraft.location.locality || 'Udupi District Sector',
+          taluk: reportDraft.location.taluk || 'Udupi',
+          district: reportDraft.location.district || 'Udupi',
+          latitude: reportDraft.location.latitude ?? 13.3408,
+          longitude: reportDraft.location.longitude ?? 74.7421,
+          accuracy: 12,
+        },
+        reporter: {
+          name: reportDraft.reporter.name || 'Citizen Distress Caller',
+          phone: reportDraft.reporter.phone || '+91 94812 99999',
+        },
+        acknowledged: false,
+      }
+      emergencyNotifications.unshift(notification)
+      dispatchListeners.forEach((listener) => {
+        try {
+          listener(notification)
+        } catch {
+          // ignore
+        }
+      })
+    }
+
     return newReport
   },
 
@@ -142,5 +202,23 @@ export const reportStore = {
     report.verificationStatus = status
     report.updatedAt = new Date().toISOString()
     return report
+  },
+
+  getEmergencyNotifications(): EmergencyDispatchNotification[] {
+    return [...emergencyNotifications]
+  },
+
+  subscribeEmergency(listener: DispatchListener): () => void {
+    dispatchListeners.add(listener)
+    return () => dispatchListeners.delete(listener)
+  },
+
+  acknowledgeEmergency(id: string, helperName?: string) {
+    const item = emergencyNotifications.find((n) => n.id === id || n.reportId === id)
+    if (item) {
+      item.acknowledged = true
+      item.acknowledgedBy = helperName || 'SAR Team Alpha'
+      item.acknowledgedAt = new Date().toISOString()
+    }
   },
 }
