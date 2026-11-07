@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { isSupabaseConfigured } from '../../lib/supabase'
 import { reportRepository } from './data/reportRepository'
 import type { SanketAssistanceNeed, SanketCategory, SanketReport, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
-import SosBeacon from './SosBeacon'
+import SosBeacon, { type GeoTrackedCoords } from './SosBeacon'
 import './sanket.css'
 
 const incidentTypes: { value: SanketReportType; label: string; description: string }[] = [
@@ -241,6 +241,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
   async function handleTriggerSosBeacon(
     threat: 'flood' | 'collapse' | 'medical' | 'trapped',
     elevation: 'trapped_roof' | 'rescued_safe',
+    coords?: GeoTrackedCoords,
   ) {
     setActionBusy(true)
     setLoadError('')
@@ -266,18 +267,18 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
             : 'shelter_required',
         urgency: 'critical',
         location: {
-          label: 'Citizen LoRa Mesh Anchor (RTK-FIX)',
+          label: coords ? `Citizen Live GPS Fix (±${coords.accuracy}m)` : 'Citizen LoRa Mesh Anchor (RTK-FIX)',
           locality: 'Udupi Floodplain Sector 4',
           taluk: 'Udupi',
           district: 'Udupi',
-          latitude: 13.3408,
-          longitude: 74.7421,
+          latitude: coords?.latitude ?? 13.3408,
+          longitude: coords?.longitude ?? 74.7421,
           source: 'device',
         },
         summary: `EMERGENCY SOS BEACON: ${threatLabel.toUpperCase()}`,
         details: `3-Second Instant Beacon Broadcast. Elevation: ${
           elevation === 'trapped_roof' ? 'Trapped on Roof (L+2)' : 'Rescued/Safe'
-        }. Zero-data payload transmitted via LoRa mesh relay.`,
+        }. GNSS Position: ${coords?.latitude ?? 13.3408}° N, ${coords?.longitude ?? 74.7421}° E (±${coords?.accuracy ?? 2}m). Zero-data payload transmitted via LoRa mesh relay.`,
         reporter: {
           name: 'Citizen Beacon Caller',
           phone: '+91 94812 99999',

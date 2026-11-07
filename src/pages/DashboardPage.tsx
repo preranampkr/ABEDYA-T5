@@ -19,7 +19,7 @@ import { modulesByRole, roleLabels } from '../data/modules'
 import { punarjeevStore } from '../features/punarjeev/data/punarjeevStore'
 import { reportRepository } from '../features/sanket/data/reportRepository'
 import type { SanketReportDraft } from '../features/sanket/types'
-import SosBeacon from '../features/sanket/SosBeacon'
+import SosBeacon, { type GeoTrackedCoords } from '../features/sanket/SosBeacon'
 import { senaStore } from '../features/sena/data/senaStore'
 import type { WorkspaceRole } from '../types/domain'
 
@@ -52,6 +52,7 @@ export default function DashboardPage({ role }: DashboardPageProps) {
   const handleTriggerSos = async (
     threat: 'flood' | 'collapse' | 'medical' | 'trapped',
     elevation: 'trapped_roof' | 'rescued_safe',
+    coords?: GeoTrackedCoords,
   ) => {
     const threatLabel =
       threat === 'flood'
@@ -74,18 +75,18 @@ export default function DashboardPage({ role }: DashboardPageProps) {
           : 'shelter_required',
       urgency: 'critical',
       location: {
-        label: 'Citizen LoRa Mesh Anchor (RTK-FIX)',
+        label: coords ? `Citizen Live GPS Fix (±${coords.accuracy}m)` : 'Citizen LoRa Mesh Anchor (RTK-FIX)',
         locality: 'Udupi Floodplain Sector 4',
         taluk: 'Udupi',
         district: 'Udupi',
-        latitude: 13.3408,
-        longitude: 74.7421,
+        latitude: coords?.latitude ?? 13.3408,
+        longitude: coords?.longitude ?? 74.7421,
         source: 'device',
       },
       summary: `EMERGENCY SOS BEACON: ${threatLabel.toUpperCase()}`,
       details: `3-Second Instant Beacon Broadcast from Overview Hub. Elevation: ${
         elevation === 'trapped_roof' ? 'Trapped on Roof (L+2)' : 'Rescued/Safe'
-      }. Zero-data payload transmitted via LoRa mesh relay.`,
+      }. GNSS Position: ${coords?.latitude ?? 13.3408}° N, ${coords?.longitude ?? 74.7421}° E (±${coords?.accuracy ?? 2}m). Zero-data payload transmitted via LoRa mesh relay.`,
       reporter: {
         name: 'Citizen Beacon Caller',
         phone: '+91 94812 99999',

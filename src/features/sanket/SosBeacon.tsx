@@ -6,6 +6,9 @@ import {
   Flashlight,
   HeartPulse,
   Home,
+  Locate,
+  LocateFixed,
+  MapPin,
   Radio,
   Shield,
   Users,
@@ -15,14 +18,27 @@ import {
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 
-type ThreatType = 'flood' | 'collapse' | 'medical' | 'trapped'
-type ElevationType = 'trapped_roof' | 'rescued_safe'
+export type ThreatType = 'flood' | 'collapse' | 'medical' | 'trapped'
+export type ElevationType = 'trapped_roof' | 'rescued_safe'
+
+export interface GeoTrackedCoords {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number | null
+  heading?: number | null
+  speed?: number | null
+}
 
 interface SosBeaconProps {
-  onTriggerSos: (threat: ThreatType, elevation: ElevationType) => Promise<void>
+  onTriggerSos: (threat: ThreatType, elevation: ElevationType, coords?: GeoTrackedCoords) => Promise<void>
   isBroadcasting?: boolean
   broadcastId?: string | null
   onCancelBroadcast?: () => void
+}
+
+function formatCoordinate(val: number, hemisphere: 'N' | 'S' | 'E' | 'W') {
+  return `${Math.abs(val).toFixed(4)}° ${hemisphere}`
 }
 
 export default function SosBeacon({
@@ -40,15 +56,98 @@ export default function SosBeacon({
   const [localBeaconActive, setLocalBeaconActive] = useState(false)
   const beaconActive = isBroadcasting || localBeaconActive
 
+  // Live Realtime Location Tracking State
+  const [coords, setCoords] = useState<GeoTrackedCoords>({
+    latitude: 13.3408,
+    longitude: 74.7421,
+    accuracy: 2,
+    altitude: 6.4,
+    heading: null,
+    speed: null,
+  })
+  const [geoStatus, setGeoStatus] = useState<'acquiring' | 'locked' | 'fallback' | 'denied'>('acquiring')
+
   const holdIntervalRef = useRef<number | null>(null)
   const startTimeRef = useRef<number>(0)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const oscRef = useRef<OscillatorNode | null>(null)
   const strobeIntervalRef = useRef<number | null>(null)
+  const watchIdRef = useRef<number | null>(null)
 
   const requiredHoldTimeMs = 3000
   const radius = 46
   const circumference = 2 * Math.PI * radius
+
+  // Request realtime GPS location lock
+  const requestGpsLock = () => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setGeoStatus('fallback')
+      return
+    }
+
+    setGeoStatus('acquiring')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({
+          latitude: Number(pos.coords.latitude.toFixed(5)),
+          longitude: Number(pos.coords.longitude.toFixed(5)),
+          accuracy: Math.round(pos.coords.accuracy),
+          altitude: pos.coords.altitude ? Math.round(pos.coords.altitude) : null,
+          heading: pos.coords.heading,
+          speed: pos.coords.speed,
+        })
+        setGeoStatus('locked')
+      },
+      (err) => {
+        setGeoStatus(err.code === err.PERMISSION_DENIED ? 'denied' : 'fallback')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 3000,
+      },
+    )
+  }
+
+  // Active position watching effect
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const id = navigator.geolocation.watchPosition(
+          (pos) => {
+            setCoords({
+              latitude: Number(pos.coords.latitude.toFixed(5)),
+              longitude: Number(pos.coords.longitude.toFixed(5)),
+              accuracy: Math.round(pos.coords.accuracy),
+              altitude: pos.coords.altitude ? Math.round(pos.coords.altitude) : null,
+              heading: pos.coords.heading,
+              speed: pos.coords.speed,
+            })
+            setGeoStatus('locked')
+          },
+          (err) => {
+            if (err.code === err.PERMISSION_DENIED) {
+              setGeoStatus('denied')
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 5000,
+          },
+        )
+        watchIdRef.current = id
+      } catch {
+        // Fallback
+      }
+    }
+
+    return () => {
+      if (watchIdRef.current !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+      }
+    }
+  }, [])
 
   // Cleanup Web Audio and strobe on unmount
   useEffect(() => {
@@ -97,7 +196,7 @@ export default function SosBeacon({
           navigator.vibrate([200, 100, 200, 100, 500])
         }
 
-        void onTriggerSos(selectedThreat, elevationStatus)
+        void onTriggerSos(selectedThreat, elevationStatus, coords)
       }
     }, 40)
   }
@@ -166,66 +265,284 @@ export default function SosBeacon({
 
   return (
     <div className="sos-beacon-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Live Telemetry Status Strip */}
+      {/* Live Telemetry Status Strip with Realtime GPS Track */}
       <div
         className="sos-telemetry-strip"
         style={{
           background: 'var(--panel)',
-          border: '1px solid var(--border)',
+          border: geoStatus === 'locked' ? '1px solid var(--tactical)' : '1px solid var(--border)',
           borderRadius: '12px',
           padding: '12px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
+          transition: 'border-color 0.3s ease',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                backgroundColor: 'var(--tactical)',
+                backgroundColor:
+                  geoStatus === 'locked' ? 'var(--tactical)' : geoStatus === 'acquiring' ? 'var(--accent-amber)' : 'var(--accent-coral)',
                 display: 'inline-block',
-                boxShadow: '0 0 8px var(--tactical)',
+                boxShadow: geoStatus === 'locked' ? '0 0 8px var(--tactical)' : 'none',
               }}
             />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--paper)', fontWeight: 700, letterSpacing: '0.05em' }}>
-              LORA MESH: RELAY #04 (UDUPI-COASTAL)
+              {geoStatus === 'locked'
+                ? 'GPS SATELLITE LOCK (LIVE TRACKING)'
+                : geoStatus === 'acquiring'
+                ? 'ACQUIRING GNSS SATELLITE FIX…'
+                : 'LORA MESH: RELAY #04 (FALLBACK ACTIVE)'}
             </span>
           </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              background: 'rgba(245, 189, 88, 0.15)',
-              color: 'var(--accent-amber)',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 700,
-            }}
-          >
-            <Radio size={12} aria-hidden="true" />
-            <span>FALLBACK ACTIVE</span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={requestGpsLock}
+              title="Request high-precision GPS lock"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: geoStatus === 'locked' ? 'rgba(131, 185, 107, 0.15)' : 'rgba(245, 189, 88, 0.15)',
+                color: geoStatus === 'locked' ? 'var(--tactical)' : 'var(--accent-amber)',
+                border: '1px solid currentColor',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <LocateFixed size={12} aria-hidden="true" />
+              <span>{geoStatus === 'locked' ? 'REALTIME TRACK' : 'LOCK GPS'}</span>
+            </button>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'rgba(0,0,0,0.25)',
+                color: 'var(--sage)',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+              }}
+            >
+              <Radio size={11} aria-hidden="true" />
+              <span>LORA 865MHz</span>
+            </div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', paddingTop: '4px' }}>
           <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: '6px' }}>
             <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>COORDINATES</span>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--paper)', fontWeight: 600 }}>13.3408° N, 74.7421° E</span>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--paper)', fontWeight: 600 }}>
+              {formatCoordinate(coords.latitude, coords.latitude >= 0 ? 'N' : 'S')},{' '}
+              {formatCoordinate(coords.longitude, coords.longitude >= 0 ? 'E' : 'W')}
+            </span>
           </div>
           <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: '6px' }}>
             <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>ACCURACY</span>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', fontWeight: 600 }}>±1.8m (RTK-FIX)</span>
+            <span
+              style={{
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                color: geoStatus === 'locked' ? 'var(--tactical)' : 'var(--accent-amber)',
+                fontWeight: 600,
+              }}
+            >
+              ±{coords.accuracy}m {geoStatus === 'locked' ? '(RTK-FIX)' : '(APPROX)'}
+            </span>
           </div>
           <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 8px', borderRadius: '6px' }}>
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>PWR / ECO</span>
-            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)', fontWeight: 600 }}>84% • 18H EST</span>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>ELEVATION</span>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)', fontWeight: 600 }}>
+              {coords.altitude ? `+${coords.altitude}m MSL` : '+6.4m MSL (BARO)'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Tactical Location Tracker Radar Widget */}
+      <div
+        style={{
+          background: 'var(--forest)',
+          border: '1px solid var(--border)',
+          borderRadius: '12px',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={16} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+            <div>
+              <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--tactical)', textTransform: 'uppercase' }}>
+                LIVE BEACON GEOLOCATION TRACK
+              </span>
+              <span style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--paper)' }}>
+                {geoStatus === 'locked' ? 'High-Precision Realtime GPS Lock Active' : 'LoRa Mesh Fixed Sector Anchor'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={requestGpsLock}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              color: 'var(--paper)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            <Locate size={12} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+            <span>CALIBRATE FIX</span>
+          </button>
+        </div>
+
+        {/* Tactical Radar Display Scope */}
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '110px',
+            background: 'radial-gradient(circle at center, #15231b 0%, #04110a 100%)',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Topo radar grid pattern */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: 'radial-gradient(circle, rgba(158, 213, 132, 0.12) 1px, transparent 1px)',
+              backgroundSize: '16px 16px',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Concentric Range Rings */}
+          <div
+            style={{
+              position: 'absolute',
+              width: '70px',
+              height: '70px',
+              borderRadius: '50%',
+              border: '1px dashed rgba(158, 213, 132, 0.25)',
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              width: '130px',
+              height: '130px',
+              borderRadius: '50%',
+              border: '1px solid rgba(158, 213, 132, 0.15)',
+              pointerEvents: 'none',
+            }}
+          />
+
+          {/* Crosshair lines */}
+          <div style={{ position: 'absolute', width: '100%', height: '1px', background: 'rgba(158, 213, 132, 0.15)' }} />
+          <div style={{ position: 'absolute', height: '100%', width: '1px', background: 'rgba(158, 213, 132, 0.15)' }} />
+
+          {/* Central Pulsing Live User Beacon Pin */}
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            }}
+          >
+            <span
+              style={{
+                position: 'absolute',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'rgba(255, 180, 171, 0.35)',
+              }}
+            />
+            <span
+              style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: '#ffb4ab',
+                border: '2px solid #690005',
+                display: 'inline-block',
+                boxShadow: '0 0 10px #ffb4ab',
+              }}
+            />
+          </div>
+
+          {/* Radar Micro-readout overlays */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              left: '8px',
+              fontSize: '8px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--tactical)',
+              fontWeight: 700,
+            }}
+          >
+            BEARING: 284° WNW • HDOP {geoStatus === 'locked' ? '0.8' : '1.4'}
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              right: '8px',
+              fontSize: '8px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--accent-sky)',
+              fontWeight: 700,
+            }}
+          >
+            RANGE RING: 250m
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '6px',
+              left: '8px',
+              fontSize: '8px',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--sage)',
+            }}
+          >
+            NEAREST SHELTER: 1.4km (CAMP ALPHA)
           </div>
         </div>
       </div>
@@ -355,7 +672,7 @@ export default function SosBeacon({
             {beaconActive ? 'DISTRESS SIGNAL BROADCASTING' : isHolding ? 'TRANSMITTING BEACON… HOLD!' : 'HOLD 3 SEC FOR RESCUE BEACON'}
           </p>
           <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--sage)' }}>
-            Tactical mesh broadcast transmits zero-data GPS packet
+            Tactical mesh broadcast transmits zero-data GPS packet with live coordinates
           </p>
         </div>
 
