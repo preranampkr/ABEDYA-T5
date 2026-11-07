@@ -128,7 +128,7 @@ function requireSupabase() {
 }
 
 function isLocalPrototype() {
-  return !supabase && isLocalPreviewEnabled()
+  return !supabase || isLocalPreviewEnabled()
 }
 
 function requirePrototypeReport(id: string) {

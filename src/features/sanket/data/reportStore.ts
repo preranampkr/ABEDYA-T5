@@ -1,10 +1,7 @@
 import { sampleReports } from './sampleReports.ts'
 import type { EmergencyDispatchNotification, SanketReport, SanketReportDraft, SanketStatus, SanketStatusHistoryEntry, SanketUrgency } from '../types'
 
-const prototypeReports: SanketReport[] = [...sampleReports]
-const lifecycleOrder: SanketStatus[] = ['submitted', 'incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
-
-const emergencyNotifications: EmergencyDispatchNotification[] = [
+const defaultEmergencies: EmergencyDispatchNotification[] = [
   {
     id: 'DISP-SNK-9101',
     reportId: 'SNK-9101',
@@ -28,8 +25,120 @@ const emergencyNotifications: EmergencyDispatchNotification[] = [
   },
 ]
 
+function loadStoredReports(): SanketReport[] {
+  if (typeof window === 'undefined') return [...sampleReports]
+  try {
+    const raw = window.localStorage.getItem('abhedya.sanket.reports')
+    if (raw) {
+      const parsed = JSON.parse(raw) as SanketReport[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {
+    // fallback
+  }
+  return [...sampleReports]
+}
+
+function saveReports(reports: SanketReport[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem('abhedya.sanket.reports', JSON.stringify(reports))
+  } catch {
+    // ignore
+  }
+}
+
+function loadStoredEmergencies(): EmergencyDispatchNotification[] {
+  if (typeof window === 'undefined') return [...defaultEmergencies]
+  try {
+    const raw = window.localStorage.getItem('abhedya.sanket.emergency_dispatches')
+    if (raw) {
+      const parsed = JSON.parse(raw) as EmergencyDispatchNotification[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {
+    // fallback
+  }
+  return [...defaultEmergencies]
+}
+
+function saveEmergencies(notifications: EmergencyDispatchNotification[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem('abhedya.sanket.emergency_dispatches', JSON.stringify(notifications))
+  } catch {
+    // ignore
+  }
+}
+
+const prototypeReports: SanketReport[] = loadStoredReports()
+const emergencyNotifications: EmergencyDispatchNotification[] = loadStoredEmergencies()
+
 type DispatchListener = (notification: EmergencyDispatchNotification) => void
 const dispatchListeners = new Set<DispatchListener>()
+
+let emergencyBroadcastChannel: BroadcastChannel | null = null
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    emergencyBroadcastChannel = new BroadcastChannel('abhedya_emergency_stream')
+    emergencyBroadcastChannel.onmessage = (event) => {
+      if (event.data?.type === 'EMERGENCY_DISPATCH' && event.data.notification) {
+        const notif = event.data.notification as EmergencyDispatchNotification
+        if (!emergencyNotifications.some((n) => n.id === notif.id)) {
+          emergencyNotifications.unshift(notif)
+        }
+        if (event.data.report) {
+          const rep = event.data.report as SanketReport
+          if (!prototypeReports.some((r) => r.id === rep.id)) {
+            prototypeReports.unshift(rep)
+          }
+        }
+        dispatchListeners.forEach((listener) => {
+          try {
+            listener(notif)
+          } catch {
+            // ignore
+          }
+        })
+      } else if (event.data?.type === 'ACKNOWLEDGE_EMERGENCY') {
+        const id = event.data.id as string
+        const item = emergencyNotifications.find((n) => n.id === id || n.reportId === id)
+        if (item) {
+          item.acknowledged = true
+          item.acknowledgedBy = event.data.helperName || 'Field Responder'
+          dispatchListeners.forEach((listener) => {
+            try {
+              listener(item)
+            } catch {
+              // ignore
+            }
+          })
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'abhedya.sanket.emergency_dispatches' && event.newValue) {
+      try {
+        const dispatches = JSON.parse(event.newValue) as EmergencyDispatchNotification[]
+        const latest = dispatches[0]
+        if (latest && !emergencyNotifications.some((n) => n.id === latest.id)) {
+          emergencyNotifications.unshift(latest)
+          dispatchListeners.forEach((l) => l(latest))
+        }
+      } catch {
+        // ignore
+      }
+    }
+  })
+}
+
+const lifecycleOrder: SanketStatus[] = ['submitted', 'incoming', 'under_review', 'assigned', 'in_progress', 'resolved', 'closed']
 
 const isValidTransition = (from: SanketStatus, to: SanketStatus) => {
   const fromIndex = lifecycleOrder.indexOf(from)
@@ -114,6 +223,7 @@ export const reportStore = {
     }
 
     prototypeReports.unshift(newReport)
+    saveReports(prototypeReports)
 
     if (reportDraft.reportType === 'sos' || reportDraft.urgency === 'critical') {
       const notification: EmergencyDispatchNotification = {
@@ -138,6 +248,16 @@ export const reportStore = {
         acknowledged: false,
       }
       emergencyNotifications.unshift(notification)
+      saveEmergencies(emergencyNotifications)
+      try {
+        emergencyBroadcastChannel?.postMessage({
+          type: 'EMERGENCY_DISPATCH',
+          notification,
+          report: newReport,
+        })
+      } catch {
+        // ignore
+      }
       dispatchListeners.forEach((listener) => {
         try {
           listener(notification)
@@ -219,6 +339,23 @@ export const reportStore = {
       item.acknowledged = true
       item.acknowledgedBy = helperName || 'SAR Team Alpha'
       item.acknowledgedAt = new Date().toISOString()
+      saveEmergencies(emergencyNotifications)
+      try {
+        emergencyBroadcastChannel?.postMessage({
+          type: 'ACKNOWLEDGE_EMERGENCY',
+          id,
+          helperName,
+        })
+      } catch {
+        // ignore
+      }
+      dispatchListeners.forEach((listener) => {
+        try {
+          listener(item)
+        } catch {
+          // ignore
+        }
+      })
     }
   },
 }

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Clock3, FileText, LocateFixed, MapPin, Radio, ShieldAlert, Siren, UserRound } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, FileText, MapPin, Radio, ShieldAlert, UserRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DashboardLayout from '../../components/DashboardLayout'
@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { isSupabaseConfigured } from '../../lib/supabase'
 import { reportRepository } from './data/reportRepository'
-import type { EmergencyDispatchNotification, SanketAssistanceNeed, SanketCategory, SanketReport, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
+import type { SanketAssistanceNeed, SanketCategory, SanketReport, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
 import SosBeacon, { type GeoTrackedCoords } from './SosBeacon'
 import HelperTrackingMap from './HelperTrackingMap'
 import './sanket.css'
@@ -122,39 +122,13 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
     setSelectedReportId(result.selected?.id ?? null)
   }, [role, selectedReportId])
 
-  // Real-time Emergency Dispatch Alerts for Helpers
-  const [emergencyAlerts, setEmergencyAlerts] = useState<EmergencyDispatchNotification[]>(() =>
-    reportRepository.getEmergencyNotifications().filter((n) => !n.acknowledged)
-  )
-
+  // Auto-refresh reports when emergency dispatches occur
   useEffect(() => {
     const unsubscribe = reportRepository.subscribeEmergency((notification) => {
-      setEmergencyAlerts((current) => [notification, ...current.filter((n) => n.id !== notification.id)])
       void refreshReports(notification.reportId)
     })
     return unsubscribe
   }, [refreshReports])
-
-  const activeEmergency = emergencyAlerts[0]
-
-  const handleTrackEmergency = (reportId: string) => {
-    setSelectedReportId(reportId)
-    const target = reports.find((r) => r.id === reportId)
-    if (target) {
-      setSelectedReport(target)
-    } else {
-      void refreshReports(reportId)
-    }
-    if (activeEmergency) {
-      reportRepository.acknowledgeEmergency(activeEmergency.id, 'SAR Field Responder')
-      setEmergencyAlerts((cur) => cur.filter((n) => n.id !== activeEmergency.id))
-    }
-  }
-
-  const handleDismissAlert = (id: string) => {
-    reportRepository.acknowledgeEmergency(id, 'Helper Team')
-    setEmergencyAlerts((cur) => cur.filter((n) => n.id !== id))
-  }
 
   const previewQueue = reports.slice(0, 4)
 
@@ -404,98 +378,6 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
           </section>
 
           {loadError && <p className="form-message" role="alert">{loadError}</p>}
-
-          {/* Real-time Emergency Dispatch Alert Banner for Helpers */}
-          {activeEmergency && (
-            <div
-              style={{
-                background: 'linear-gradient(90deg, #93000a 0%, #4a0005 100%)',
-                border: '1.5px solid #ffb4ab',
-                borderRadius: '10px',
-                padding: '12px 16px',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px',
-                boxShadow: '0 4px 20px rgba(147, 0, 10, 0.45)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 10px #ffb4ab',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Siren size={18} style={{ color: '#93000a' }} aria-hidden="true" />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#ffdad6' }}>
-                      PRIORITY-1 EMERGENCY DISPATCH: SOS RESCUE BEACON RECEIVED
-                    </strong>
-                    <span style={{ background: '#08160f', color: '#ffb4ab', fontSize: '9px', fontFamily: 'var(--font-mono)', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
-                      INCIDENT #{activeEmergency.reportId}
-                    </span>
-                  </div>
-                  <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#ffd0cb' }}>
-                    Target: <strong>{activeEmergency.location.locality}</strong> ({activeEmergency.location.latitude.toFixed(4)}° N, {activeEmergency.location.longitude.toFixed(4)}° E) • Threat: {activeEmergency.threat.toUpperCase()}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleTrackEmergency(activeEmergency.reportId)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: '#ffffff',
-                    color: '#93000a',
-                    fontWeight: 800,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    padding: '7px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  <LocateFixed size={13} />
-                  <span>TRACK LOCATION & RESPOND</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDismissAlert(activeEmergency.id)}
-                  style={{
-                    background: 'rgba(0,0,0,0.35)',
-                    color: '#ffdad6',
-                    border: '1px solid #ffb4ab',
-                    fontSize: '10px',
-                    fontFamily: 'var(--font-mono)',
-                    fontWeight: 700,
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ACKNOWLEDGE
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="helper-layout">
             <aside className="sanket-panel helper-queue-panel">

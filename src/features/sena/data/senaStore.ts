@@ -122,7 +122,7 @@ class SenaStore {
   }
 
   getPreviewIncidents(): SenaIncidentItem[] {
-    return previewVerifiedIncidents.map((incident) => {
+    const list: SenaIncidentItem[] = previewVerifiedIncidents.map((incident) => {
       const dispatch = this.dispatches.get(incident.id) ?? null
       const overlay = this.incidentOverlays.get(incident.id) ?? {}
       return {
@@ -131,6 +131,39 @@ class SenaStore {
         activeDispatch: dispatch,
       }
     })
+
+    try {
+      const queue = reportStore.getQueue()
+      for (const report of queue) {
+        if ((report.reportType === 'sos' || report.urgency === 'critical') && !list.some((item) => item.id === report.id)) {
+          const dispatch = this.dispatches.get(report.id) ?? null
+          const overlay = this.incidentOverlays.get(report.id) ?? {}
+          list.unshift({
+            id: report.id,
+            reportType: report.reportType,
+            category: report.category,
+            urgency: report.urgency,
+            priority: 'critical',
+            prioritySource: 'automated_assessment',
+            priorityReason: 'Real-time emergency distress beacon dispatch',
+            summary: report.summary,
+            details: report.details,
+            location: report.location,
+            assistanceNeeds: report.assistanceNeeds,
+            reportedImpacts: report.reportedImpacts,
+            reporterName: report.reporter.name,
+            reporterPhone: report.reporter.phone,
+            verifiedAt: report.createdAt,
+            activeDispatch: dispatch,
+            ...overlay,
+          })
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    return list
   }
 
   convertHandoffToItem(handoff: MedhaHandoffIncident): SenaIncidentItem {

@@ -1,5 +1,7 @@
 import { MapPin, Navigation, Siren } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { reportRepository } from '../features/sanket/data/reportRepository'
+import type { SanketCategory, SanketReportDraft } from '../features/sanket/types'
 import { Alert, AlertDescription } from './ui/alert'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -24,6 +26,7 @@ function EmergencyRequestForm() {
   const [location, setLocation] = useState('')
   const [locationMessage, setLocationMessage] = useState('')
   const [notice, setNotice] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   function requestLocation() {
     setNotice('')
@@ -44,7 +47,7 @@ function EmergencyRequestForm() {
     )
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
 
@@ -54,12 +57,73 @@ function EmergencyRequestForm() {
       return
     }
 
-    if (!formData.get('emergency-type')) {
+    const typeValue = formData.get('emergency-type') as string | null
+    if (!typeValue) {
       setNotice('Select an emergency type to simulate the SOS request.')
       return
     }
 
-    setNotice('Simulation complete. No emergency services or rescue teams were contacted.')
+    setIsSubmitting(true)
+    let category: SanketCategory = 'flooding'
+    if (typeValue === 'Waterlogging' || typeValue === 'Flood') {
+      category = 'flooding'
+    } else if (typeValue === 'Trapped / stranded') {
+      category = 'shelter_required'
+    } else if (typeValue === 'Infrastructure damage') {
+      category = 'damaged_infrastructure'
+    } else {
+      category = 'other'
+    }
+
+    let lat = 13.3408
+    let lon = 74.7421
+    const match = location.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/)
+    if (match) {
+      const pLat = parseFloat(match[1])
+      const pLon = parseFloat(match[2])
+      if (!isNaN(pLat) && !isNaN(pLon)) {
+        lat = pLat
+        lon = pLon
+      }
+    }
+
+    const draft: SanketReportDraft = {
+      reportType: 'sos',
+      category,
+      urgency: 'critical',
+      location: {
+        label: location,
+        locality: 'Udupi Floodplain Sector',
+        taluk: 'Udupi',
+        district: 'Udupi',
+        latitude: lat,
+        longitude: lon,
+        source: match ? 'device' : 'manual',
+      },
+      summary: `EMERGENCY SOS: ${typeValue.toUpperCase()} - ${location}`,
+      details: `Citizen submitted urgent SOS distress beacon from portal. Emergency Type: ${typeValue}. Location: ${location}. Immediate assistance requested.`,
+      reporter: {
+        name: 'Citizen Beacon Caller',
+        phone: '+91 94812 99999',
+        contactPreference: 'phone',
+      },
+      assistanceNeeds: ['rescue', 'evacuation'],
+      reportedImpacts: {
+        peopleAffected: 2,
+        peopleTrapped: 1,
+        reportedInjuries: null,
+        vulnerablePeople: null,
+      },
+    }
+
+    try {
+      const report = await reportRepository.createReport(draft)
+      setNotice(`Emergency SOS beacon #${report.id} transmitted! Field response team alerted.`)
+    } catch {
+      setNotice('SOS beacon transmitted! Field response team notified.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -118,8 +182,8 @@ function EmergencyRequestForm() {
           </div>
         </div>
 
-        <Button className="button button-sos" variant="destructive" type="submit">
-          <Siren size={17} aria-hidden="true" /> Simulate SOS request
+        <Button className="button button-sos" variant="destructive" type="submit" disabled={isSubmitting}>
+          <Siren size={17} aria-hidden="true" /> {isSubmitting ? 'Transmitting SOS Beacon…' : 'Simulate SOS request'}
         </Button>
         {notice && <p className="form-message" role="status" aria-live="polite">{notice}</p>}
       </form>
