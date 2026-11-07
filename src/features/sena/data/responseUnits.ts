@@ -219,3 +219,4 @@ export function getUnitMatchScore(unit: ResponseUnit, needs: SanketAssistanceNee
   const score = matched.length + (unit.status === 'available' ? 5 : 0)
   return { score, matchedCapabilities: matched }
 }
+

@@ -1,3 +1,4 @@
+import 'leaflet/dist/leaflet.css'
 import { divIcon } from 'leaflet'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
@@ -62,6 +63,7 @@ function MapExtent({ bounds, center, hasBoundary }: {
 }) {
   const map = useMap()
   useEffect(() => {
+    map.invalidateSize()
     if (hasBoundary && bounds) {
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10 })
       return
@@ -69,6 +71,17 @@ function MapExtent({ bounds, center, hasBoundary }: {
     if (!center) return
     map.setView(center, 10)
   }, [bounds, center, hasBoundary, map])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+      if (hasBoundary && bounds) {
+        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 10 })
+      }
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [bounds, hasBoundary, map])
+
   return null
 }
 

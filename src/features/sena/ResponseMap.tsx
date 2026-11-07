@@ -1,3 +1,4 @@
+import 'leaflet/dist/leaflet.css'
 import { divIcon } from 'leaflet'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
@@ -53,6 +54,7 @@ function MapViewSync({
 }) {
   const map = useMap()
   useEffect(() => {
+    map.invalidateSize()
     if (selectedCoords) {
       map.flyTo(selectedCoords, 13, { duration: 0.8 })
       return
@@ -61,6 +63,14 @@ function MapViewSync({
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 11 })
     }
   }, [bounds, map, selectedCoords])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [map])
+
   return null
 }
 

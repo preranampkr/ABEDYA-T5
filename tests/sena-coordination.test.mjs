@@ -151,3 +151,4 @@ test('handoff conversion maps priority provenance and verified report fields', (
   assert.equal(senaItem.reportedImpacts.peopleTrapped, 3)
   assert.deepEqual(senaItem.assistanceNeeds, ['rescue', 'medical'])
 })
+
