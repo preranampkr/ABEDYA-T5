@@ -77,3 +77,4 @@ export const punarjeevRepository = {
     return punarjeevStore.updateRehabStatus(id, status, notes)
   },
 }
+

@@ -351,17 +351,72 @@ export default function PunarjeevPage({ role = 'victim' }: PunarjeevPageProps) {
         </section>
 
         {/* Operational Flash Alert Banner */}
-        <section className="punarjeev-flash-banner">
+        <section className="punarjeev-flash-banner" style={{ background: '#93000a', borderColor: '#ffb4ab', color: '#ffdad6' }}>
           <div className="punarjeev-flash-left">
-            <AlertTriangle size={20} aria-hidden="true" />
+            <AlertTriangle size={20} style={{ color: '#ffb4ab' }} aria-hidden="true" />
             <div>
-              <strong>NDMA FLASH BULLETIN:</strong> Sowparnika &amp; Varahi river outflow cresting +1.8m. Evacuees in low-lying sectors directed to high-elevation shelters immediately.
+              <strong style={{ letterSpacing: '0.04em' }}>NDMA FLASH BULLETIN 04 (14:22 IST):</strong> Dam sluice gates opening at 16:00 IST. Low-lying Sector 4 evacuation mandatory.
+              <span style={{ display: 'block', fontSize: '10px', color: '#ffdad6', opacity: 0.85, marginTop: '2px' }}>
+                Signed: Maj. V. Nair (Incident Controller) • Coastal Karnataka Emergency Response Authority
+              </span>
             </div>
           </div>
-          <Badge variant="outline" className="badge" style={{ borderColor: 'var(--red)', color: 'var(--red)' }}>
-            SURGE WARNING ACTIVE
+          <Badge variant="outline" className="badge" style={{ borderColor: '#ffb4ab', background: '#04110a', color: '#ffb4ab', fontWeight: 800 }}>
+            EVAC MANDATORY
           </Badge>
         </section>
+
+        {/* Bento Overview Summary Metrics */}
+        <div className="punarjeev-bento-grid">
+          <div className="punarjeev-bento-card">
+            <div className="punarjeev-bento-header">
+              <span>SHELTERED SOULS</span>
+              <Users size={16} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+            </div>
+            <div>
+              <div className="punarjeev-bento-value" style={{ color: 'var(--tactical)' }}>3,420</div>
+              <span style={{ fontSize: '10px', color: 'var(--sage)' }}>+148 registered in last 1h</span>
+            </div>
+          </div>
+
+          <div className="punarjeev-bento-card">
+            <div className="punarjeev-bento-header">
+              <span>CAPACITY LOAD</span>
+              <Bed size={16} style={{ color: 'var(--accent-amber)' }} aria-hidden="true" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                <div className="punarjeev-bento-value" style={{ color: 'var(--accent-amber)' }}>74%</div>
+                <span style={{ fontSize: '10px', color: 'var(--sage)', fontWeight: 700 }}>OCCUPIED</span>
+              </div>
+              <div className="punarjeev-gauge-bar">
+                <div className="punarjeev-gauge-fill" style={{ width: '74%' }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="punarjeev-bento-card">
+            <div className="punarjeev-bento-header">
+              <span>MED TENTS</span>
+              <Shield size={16} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
+            </div>
+            <div>
+              <div className="punarjeev-bento-value">12 ACTIVE</div>
+              <span style={{ fontSize: '10px', color: 'var(--sage)' }}>3 triage surgical trauma units</span>
+            </div>
+          </div>
+
+          <div className="punarjeev-bento-card">
+            <div className="punarjeev-bento-header">
+              <span>POTABLE WATER</span>
+              <Package size={16} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
+            </div>
+            <div>
+              <div className="punarjeev-bento-value" style={{ color: 'var(--accent-sky)' }}>48 HRS</div>
+              <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Resupply convoy in transit</span>
+            </div>
+          </div>
+        </div>
 
         {/* Feedback Alerts */}
         {feedbackError && (
@@ -493,11 +548,31 @@ export default function PunarjeevPage({ role = 'victim' }: PunarjeevPageProps) {
                         </div>
                       </div>
 
+                      {/* Provisions Summary */}
+                      <div className="punarjeev-provisions-grid">
+                        <div className="punarjeev-provision-tile">
+                          <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Potable Water</span>
+                          <strong style={{ fontSize: '11px', color: 'var(--paper)' }}>3,200L NORM</strong>
+                        </div>
+                        <div className="punarjeev-provision-tile">
+                          <span style={{ fontSize: '10px', color: 'var(--sage)' }}>MRE Packs</span>
+                          <strong style={{ fontSize: '11px', color: 'var(--paper)' }}>4 Days NORM</strong>
+                        </div>
+                        <div className="punarjeev-provision-tile alert">
+                          <span style={{ fontSize: '10px', color: 'var(--accent-coral)' }}>Anti-Venom</span>
+                          <strong style={{ fontSize: '10px', color: 'var(--accent-coral)' }}>CRITICAL LOW</strong>
+                        </div>
+                        <div className="punarjeev-provision-tile">
+                          <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Aux Generator</span>
+                          <strong style={{ fontSize: '11px', color: 'var(--accent-amber)' }}>18h Left</strong>
+                        </div>
+                      </div>
+
                       {/* Camp Manager Contact */}
                       <div className="punarjeev-manager-row">
                         <div>
-                          <span style={{ color: 'var(--sage)', display: 'block', fontSize: '10px' }}>Camp Manager</span>
-                          <strong>{camp.managerName}</strong> ({camp.managerPhone})
+                          <span style={{ color: 'var(--sage)', display: 'block', fontSize: '10px' }}>Camp Medical Officer</span>
+                          <strong>Dr. A. Sharma (NDRF Trauma Unit 2)</strong>
                         </div>
                         <a
                           href={`tel:${camp.managerPhone.replace(/\s+/g, '')}`}
@@ -538,7 +613,17 @@ export default function PunarjeevPage({ role = 'victim' }: PunarjeevPageProps) {
                           window.open(url, '_blank')
                         }}
                       >
-                        <MapPin size={13} aria-hidden="true" /> Route Map
+                        <MapPin size={13} aria-hidden="true" /> Get Route
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="button button-outline"
+                        onClick={() => setActiveTab('supplies')}
+                        style={{ color: 'var(--accent-coral)' }}
+                      >
+                        <Package size={13} aria-hidden="true" /> Req Supplies
                       </Button>
                       <Button
                         type="button"
@@ -547,7 +632,9 @@ export default function PunarjeevPage({ role = 'victim' }: PunarjeevPageProps) {
                         onClick={() => handleQuickAdmit(camp.id)}
                         disabled={isFull}
                       >
-                        {activeMode === 'manager' ? (
+                        {isNearCapacity ? (
+                          <>Diversion Route &rarr;</>
+                        ) : activeMode === 'manager' ? (
                           <>+ Log Admission</>
                         ) : (
                           <>Reserve Cot &rarr;</>
@@ -557,6 +644,35 @@ export default function PunarjeevPage({ role = 'victim' }: PunarjeevPageProps) {
                   </article>
                 )
               })}
+            </div>
+
+            {/* Missing Person / Family Reunification Biometrics Evacuee Locator Mini Dock */}
+            <div className="punarjeev-biometrics-dock">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: 'rgba(123, 208, 255, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Users size={24} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--paper)' }}>Biometrics Evacuee Locator</h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--sage)' }}>
+                    Lookup relatives across all 18 connected mesh relief camps
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setActiveTab('safe_check')}
+                style={{ color: 'var(--accent-sky)', borderColor: 'var(--accent-sky)', fontWeight: 700 }}
+              >
+                OPEN BANDHU SEARCH
+              </Button>
+            </div>
+
+            {/* Offline Resilience LoRa Mesh Badge */}
+            <div className="punarjeev-mesh-badge">
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--tactical)' }} />
+              <span>OFFLINE LORA MESH TELEMETRY • P2P SYNCED (14 NODES)</span>
             </div>
           </div>
         )}

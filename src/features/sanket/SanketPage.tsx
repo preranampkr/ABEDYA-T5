@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { isSupabaseConfigured } from '../../lib/supabase'
 import { reportRepository } from './data/reportRepository'
 import type { SanketAssistanceNeed, SanketCategory, SanketReport, SanketReportDraft, SanketReportType, SanketStatus, SanketUrgency } from './types'
+import SosBeacon from './SosBeacon'
 import './sanket.css'
 
 const incidentTypes: { value: SanketReportType; label: string; description: string }[] = [
@@ -106,7 +107,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
   const [helperCategoryFilter, setHelperCategoryFilter] = useState<'all' | SanketCategory>('all')
   const [helperAssignedFilter, setHelperAssignedFilter] = useState<'all' | 'assigned' | 'unassigned'>('all')
   const [helperLocationFilter, setHelperLocationFilter] = useState('')
-  const [citizenView, setCitizenView] = useState<'report' | 'assistance' | 'history'>('report')
+  const [citizenView, setCitizenView] = useState<'beacon' | 'report' | 'assistance' | 'history'>('beacon')
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
 
   const previewQueue = reports.slice(0, 4)
@@ -232,6 +233,73 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
       }
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Report could not be submitted.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleTriggerSosBeacon(
+    threat: 'flood' | 'collapse' | 'medical' | 'trapped',
+    elevation: 'trapped_roof' | 'rescued_safe',
+  ) {
+    setActionBusy(true)
+    setLoadError('')
+    try {
+      const threatLabel =
+        threat === 'flood'
+          ? 'Flash Flooding'
+          : threat === 'collapse'
+          ? 'Structural Collapse'
+          : threat === 'medical'
+          ? 'Medical Emergency'
+          : 'Trapped Civilians'
+
+      const sosDraft: SanketReportDraft = {
+        reportType: 'sos',
+        category:
+          threat === 'flood'
+            ? 'flooding'
+            : threat === 'collapse'
+            ? 'damaged_infrastructure'
+            : threat === 'medical'
+            ? 'medical_assistance'
+            : 'shelter_required',
+        urgency: 'critical',
+        location: {
+          label: 'Citizen LoRa Mesh Anchor (RTK-FIX)',
+          locality: 'Udupi Floodplain Sector 4',
+          taluk: 'Udupi',
+          district: 'Udupi',
+          latitude: 13.3408,
+          longitude: 74.7421,
+          source: 'device',
+        },
+        summary: `EMERGENCY SOS BEACON: ${threatLabel.toUpperCase()}`,
+        details: `3-Second Instant Beacon Broadcast. Elevation: ${
+          elevation === 'trapped_roof' ? 'Trapped on Roof (L+2)' : 'Rescued/Safe'
+        }. Zero-data payload transmitted via LoRa mesh relay.`,
+        reporter: {
+          name: 'Citizen Beacon Caller',
+          phone: '+91 94812 99999',
+          contactPreference: 'phone',
+        },
+        reportedImpacts: {
+          peopleAffected: 5,
+          reportedInjuries: threat === 'medical' ? 1 : null,
+          peopleTrapped: threat === 'trapped' ? 4 : 2,
+          vulnerablePeople: 1,
+        },
+        assistanceNeeds: threat === 'medical' ? ['medical', 'rescue'] : ['rescue', 'evacuation'],
+      }
+
+      const newReport = await reportRepository.createReport(sosDraft)
+      setSubmittedReportId(newReport.id)
+      setReports((current) => [newReport, ...current.filter((r) => r.id !== newReport.id)])
+      setSelectedReport(newReport)
+      setSelectedReportId(newReport.id)
+      await refreshReports(newReport.id)
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'SOS broadcast failed.')
     } finally {
       setActionBusy(false)
     }
@@ -499,8 +567,9 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
 
         <div className="victim-primary-actions">
           {[
-            { id: 'report', label: 'Report an incident', description: 'Share what happened' },
+            { id: 'beacon', label: 'SOS Emergency Beacon', description: 'Immediate 3-second hold beacon' },
             { id: 'assistance', label: 'Request assistance / SOS', description: 'Urgent help or support' },
+            { id: 'report', label: 'Report an incident', description: 'Share what happened' },
             { id: 'history', label: 'My reports', description: 'Check your submissions' },
           ].map((item) => (
             <button
@@ -508,7 +577,7 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
               type="button"
               className={`victim-action-card${citizenView === item.id ? ' active' : ''}`}
               onClick={() => {
-                setCitizenView(item.id as 'report' | 'assistance' | 'history')
+                setCitizenView(item.id as 'beacon' | 'report' | 'assistance' | 'history')
                 if (item.id === 'report') {
                   setDraft((current) => ({ ...current, reportType: 'incident' }))
                 }
@@ -523,7 +592,14 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
           ))}
         </div>
 
-        {citizenView === 'history' ? (
+        {citizenView === 'beacon' ? (
+          <SosBeacon
+            onTriggerSos={handleTriggerSosBeacon}
+            isBroadcasting={Boolean(submittedReportId)}
+            broadcastId={submittedReportId}
+            onCancelBroadcast={() => setSubmittedReportId('')}
+          />
+        ) : citizenView === 'history' ? (
           <section className="sanket-panel victim-history-panel">
             <div className="sanket-panel-header">
               <div>

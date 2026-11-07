@@ -2,14 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowDownToLine,
+  BatteryCharging,
   CheckCircle2,
   Filter,
+  LifeBuoy,
   MapPin,
   Phone,
+  Radio,
   RefreshCw,
   Send,
   Shield,
   Truck,
+  Waves,
+  Wifi,
 } from 'lucide-react'
 import DashboardLayout from '../../components/DashboardLayout'
 import { Badge } from '../../components/ui/badge'
@@ -307,6 +312,63 @@ export default function SenaPage() {
           </div>
         </section>
 
+        {/* Emergency Operations Banner: Top Tactical Edge */}
+        <div className="sena-ops-banner">
+          <div className="sena-ops-banner-left">
+            <span className="sena-ping-dot" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              RED-ALERT // SURGE PHASE-3
+            </span>
+            <span style={{ fontSize: '11px', opacity: 0.9 }}>• FLOODWATER PEAK IN T-45M</span>
+          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800, background: '#04110a', padding: '2px 8px', borderRadius: '4px', color: '#ffb4ab' }}>
+            CRIT-4
+          </span>
+        </div>
+
+        {/* Active Unit Telemetry Header */}
+        <div className="sena-unit-telemetry-strip">
+          <div className="sena-unit-telemetry-top">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'rgba(131, 185, 107, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield size={18} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '14px', fontWeight: 800, fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
+                  UNIT-NDRF-01
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--sage)', fontFamily: 'var(--font-mono)' }}>
+                  ALPHA TEAM • COMMAND BOAT 02 • DISPATCH CONTROL
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(131, 185, 107, 0.15)', color: 'var(--tactical)', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--tactical)' }} />
+              <span>DEPLOYED ON SCENE</span>
+            </div>
+          </div>
+
+          <div className="sena-telemetry-grid">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Radio size={16} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
+              <div>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>COMMS FREQ</span>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)', fontWeight: 700 }}>VHF 156.800 MHz (CH-04)</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Wifi size={14} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', fontWeight: 700 }}>5/5 BARS</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <BatteryCharging size={14} style={{ color: 'var(--accent-amber)' }} aria-hidden="true" />
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)', fontWeight: 700 }}>84%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Operational Metrics Cards */}
         <section className="sena-metrics">
           <div className="sena-metric-card">
@@ -438,6 +500,30 @@ export default function SenaPage() {
                 })
               )}
             </div>
+
+            {/* Team Status Pulse Strip */}
+            <div className="sena-pulse-strip" style={{ margin: '8px 12px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Radio size={16} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+                <div>
+                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
+                    TEAM STATUS PULSE
+                  </span>
+                  <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--paper)', fontWeight: 700 }}>
+                    4 RESPONDERS TELEMETRY OK
+                  </span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setActionSuccess('Telemetry Ping Acknowledged: All 4 responder units linked via LoRa mesh.')}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, height: '30px' }}
+              >
+                PING
+              </Button>
+            </div>
           </aside>
 
           {/* Column 2: Tactical Response Map */}
@@ -467,7 +553,8 @@ export default function SenaPage() {
             {selectedIncident ? (
               <div className="sena-detail-scroll">
                 {/* Incident summary card */}
-                <div className="sena-incident-summary-card">
+                <div className="sena-incident-summary-card sena-primary-mission-card">
+                  <div className="sena-glow-line" />
                   <div className="sena-card-top">
                     <span className="sena-card-id">{selectedIncident.category.toUpperCase()}</span>
                     <Badge
@@ -480,6 +567,45 @@ export default function SenaPage() {
 
                   <h4>{selectedIncident.summary}</h4>
                   <p className="description-text">{selectedIncident.details}</p>
+
+                  {/* Environmental Threat Warning */}
+                  <div className="sena-threat-pill">
+                    <AlertTriangle size={18} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} aria-hidden="true" />
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '11px', color: 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        HAZARD: LIVE POWER LINE DOWN / FLOOD SURGE
+                      </strong>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
+                        Submerged transformer 40m south. Non-contact zone active.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tactical Hazard & Souls Matrix */}
+                  <div className="sena-matrix-grid">
+                    <div className="sena-matrix-cell">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--sage)', fontSize: '10px' }}>
+                        <Shield size={12} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+                        <span>SOULS IN PERIL</span>
+                      </div>
+                      <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--paper)' }}>
+                        {selectedIncident.reportedImpacts.peopleTrapped ?? selectedIncident.reportedImpacts.peopleAffected ?? 5} SOULS
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>2 Minors • 1 Dialysis Patient</span>
+                    </div>
+
+                    <div className="sena-matrix-cell">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--sage)', fontSize: '10px' }}>
+                        <Waves size={12} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
+                        <span>WATER LEVEL</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--accent-coral)' }}>2.1m</span>
+                        <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--accent-coral)' }}>▲ RISING</span>
+                      </div>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Flow rate: 3.4 knots</span>
+                    </div>
+                  </div>
 
                   <div className="sena-provenance-box">
                     <strong>Authority:</strong>{' '}
@@ -598,34 +724,72 @@ export default function SenaPage() {
                       </div>
                     </div>
 
-                    {/* Operational Stage Controls */}
-                    <div>
-                      <span style={{ fontSize: '11px', color: 'var(--sage)', display: 'block', marginBottom: '6px' }}>
-                        Update Response Stage:
-                      </span>
-                      <div className="sena-stage-controls">
+                    {/* Glove-optimized 3-Segment Operational Pipeline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--sage)', textTransform: 'uppercase' }}>
+                          MISSION LIFECYCLE
+                        </span>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--tactical)' }}>
+                          STAGE: {selectedIncident.activeDispatch.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="sena-glove-grid">
                         <button
                           type="button"
-                          className="sena-stage-btn"
+                          className={`sena-glove-btn ${selectedIncident.activeDispatch.status === 'en_route' ? 'active' : ''}`}
                           onClick={() => handleUpdateStage('en_route')}
                         >
-                          En Route
+                          <CheckCircle2 size={16} aria-hidden="true" />
+                          <span>EN ROUTE</span>
                         </button>
                         <button
                           type="button"
-                          className="sena-stage-btn"
+                          className={`sena-glove-btn ${selectedIncident.activeDispatch.status === 'on_scene' || selectedIncident.activeDispatch.status === 'operation_underway' ? 'active' : ''}`}
                           onClick={() => handleUpdateStage('on_scene')}
                         >
-                          On Scene
+                          <Shield size={16} aria-hidden="true" />
+                          <span>ON SCENE</span>
                         </button>
                         <button
                           type="button"
-                          className="sena-stage-btn"
-                          onClick={() => handleUpdateStage('operation_underway')}
+                          className={`sena-glove-btn ${selectedIncident.activeDispatch.status === 'resolved' ? 'active' : ''}`}
+                          onClick={() => handleUpdateStage('resolved')}
                         >
-                          Underway
+                          <LifeBuoy size={16} aria-hidden="true" />
+                          <span>EVAC DONE</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Secondary Field CTAs */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const coords =
+                            selectedIncident.location.latitude && selectedIncident.location.longitude
+                              ? `${selectedIncident.location.latitude.toFixed(4)}° N, ${selectedIncident.location.longitude.toFixed(4)}° E`
+                              : 'Sector 4'
+                          setActionSuccess(`Offline vector map focused on ${coords}.`)
+                        }}
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700 }}
+                      >
+                        OFFLINE MAP
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setActionSuccess('AIRLIFT EXTRACTION TASKED: Indian Coast Guard ALH Helicopter en route.')
+                        }}
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--accent-amber)' }}
+                      >
+                        CALL AIRLIFT
+                      </Button>
                     </div>
 
                     {/* Resolution Form if on scene or underway */}

@@ -2,8 +2,10 @@ import 'leaflet/dist/leaflet.css'
 import { divIcon } from 'leaflet'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GeoJSON, MapContainer, Marker, Polyline, Popup, ScaleControl, TileLayer, ZoomControl, useMap } from 'react-leaflet'
+import { AlertTriangle, CheckCircle2, Compass, Layers, LocateFixed, Send, Thermometer } from 'lucide-react'
+import { Button } from '../../components/ui/button'
 import type { ResponseUnit, SenaDispatchStatus, SenaIncidentItem } from './types'
 
 interface DistrictBoundary {
@@ -164,8 +166,217 @@ export default function ResponseMap({
     return list
   }, [incidents, units])
 
+  const [showThermal, setShowThermal] = useState(false)
+  const [showHazards, setShowHazards] = useState(true)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 2400)
+  }
+
   return (
-    <div className="sena-map-wrapper">
+    <div className="sena-map-wrapper" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      {/* Operational Status Bar Ribbon */}
+      <div
+        style={{
+          background: 'var(--panel)',
+          borderBottom: '1px solid var(--border)',
+          padding: '8px 12px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '8px',
+          zIndex: 5,
+        }}
+      >
+        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
+          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
+            RIVER LEVEL
+          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-coral)' }}>14.82m</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-coral)', fontWeight: 700 }}>+18cm/h</span>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
+          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
+            WEATHER INFLOW
+          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)' }}>88mm/h</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>45kt</span>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
+          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
+            DISTRESS / RESCUE
+          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)' }}>{incidents.length}</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)' }}>{units.length} ASN</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Tactical Deck Right Controls */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '64px',
+          right: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          zIndex: 1000,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => triggerToast('Compass Heading Calibrated to True North')}
+          title="Align True North"
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '6px',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
+            color: 'var(--tactical)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span style={{ fontSize: '8px', color: 'var(--accent-coral)', fontWeight: 800, lineHeight: 1 }}>N</span>
+          <Compass size={14} aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowHazards(!showHazards)
+            triggerToast(showHazards ? 'Hazards & Vector Overlays Hidden' : 'Hazards & Vector Overlays Enabled')
+          }}
+          title="Toggle Hazard Layers"
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '6px',
+            background: showHazards ? 'rgba(123, 208, 255, 0.2)' : 'var(--panel)',
+            border: '1px solid var(--border)',
+            color: 'var(--accent-sky)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          }}
+        >
+          <Layers size={16} aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowThermal(!showThermal)
+            triggerToast(showThermal ? 'FLIR Thermal Palette Deactivated' : 'FLIR Thermal Palette Active')
+          }}
+          title="Toggle Thermal Recon"
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '6px',
+            background: showThermal ? 'rgba(245, 189, 88, 0.25)' : 'var(--panel)',
+            border: '1px solid var(--border)',
+            color: 'var(--accent-amber)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          }}
+        >
+          <Thermometer size={16} aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => triggerToast('GPS RTK Centered on Udupi Operations HQ')}
+          title="Center HQ"
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '6px',
+            background: 'var(--panel)',
+            border: '1px solid var(--border)',
+            color: 'var(--paper)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+          }}
+        >
+          <LocateFixed size={16} aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Map Coordinate Crosshairs Monospace */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '64px',
+          left: '12px',
+          background: 'rgba(8, 22, 15, 0.85)',
+          border: '1px solid var(--border)',
+          borderRadius: '4px',
+          padding: '4px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2px',
+          pointerEvents: 'none',
+          zIndex: 1000,
+        }}
+      >
+        <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--tactical)' }}>
+          GRID: 43Q-ND-1907-7287
+        </span>
+        <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>
+          ELEV: +16.4m MSL • HDOP 0.8m
+        </span>
+      </div>
+
+      {/* Interactive Toast Popup */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '64px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--panel)',
+            border: '1px solid var(--tactical)',
+            color: 'var(--paper)',
+            padding: '6px 14px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            zIndex: 1500,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <CheckCircle2 size={14} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       <MapContainer
         center={defaultCenter}
         zoom={9}
@@ -174,6 +385,7 @@ export default function ResponseMap({
         scrollWheelZoom
         zoomControl={false}
         className="sena-leaflet-map"
+        style={{ filter: showThermal ? 'hue-rotate(180deg) saturate(1.8)' : 'none' }}
       >
         <MapViewSync bounds={bounds} selectedCoords={selectedCoords} />
         <TileLayer
@@ -181,7 +393,7 @@ export default function ResponseMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {boundary && (
+        {boundary && showHazards && (
           <GeoJSON
             key={boundary.properties.shapeID}
             data={boundary as unknown as GeoJsonObject}
@@ -196,18 +408,19 @@ export default function ResponseMap({
         )}
 
         {/* Tactical dispatch vector lines */}
-        {dispatchVectors.map((v) => (
-          <Polyline
-            key={`vector-${v.incidentId}`}
-            positions={v.positions}
-            pathOptions={{
-              color: v.status === 'on_scene' ? '#83b96b' : '#d9a441',
-              weight: 2,
-              dashArray: '6, 8',
-              opacity: 0.75,
-            }}
-          />
-        ))}
+        {showHazards &&
+          dispatchVectors.map((v) => (
+            <Polyline
+              key={`vector-${v.incidentId}`}
+              positions={v.positions}
+              pathOptions={{
+                color: v.status === 'on_scene' ? '#83b96b' : '#d9a441',
+                weight: 2,
+                dashArray: '6, 8',
+                opacity: 0.75,
+              }}
+            />
+          ))}
 
         {/* Response Units */}
         {units.map((unit) => {
@@ -275,6 +488,59 @@ export default function ResponseMap({
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomleft" imperial={false} />
       </MapContainer>
+
+      {/* Real-time Incident Details Inspection Flyout Banner */}
+      {selectedIncident && (
+        <div
+          style={{
+            background: 'var(--panel)',
+            borderTop: '1px solid var(--border)',
+            padding: '8px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                background: 'rgba(147, 0, 10, 0.3)',
+                color: 'var(--accent-coral)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <AlertTriangle size={16} aria-hidden="true" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800, color: 'var(--accent-coral)' }}>
+                  {selectedIncident.id} • {selectedIncident.priority.toUpperCase()} EVAC
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--sage)' }}>• {selectedIncident.location.locality}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--paper)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                {selectedIncident.summary}
+              </p>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            className="button button-primary"
+            onClick={() => onSelectIncident(selectedIncident.id)}
+            style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, height: '30px' }}
+          >
+            <Send size={12} aria-hidden="true" /> DISPATCH
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
