@@ -75,7 +75,7 @@ export default function RequireRole({ role, children }: { role: UserRole; childr
 
   if (auth.loading) return <div className="drishti-loading" role="status">Restoring your ABHEDYA session…</div>
   if (!auth.session) {
-    if (!auth.configured && role !== 'admin' && isLocalPreviewEnabled()) return children
+    if (!auth.configured && isLocalPreviewEnabled()) return children
     const loginRole = role === 'admin' ? 'victim' : role
     return <Navigate to={`/${loginRole}/login`} replace state={{ from: location }} />
   }

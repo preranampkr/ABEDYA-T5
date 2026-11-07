@@ -34,13 +34,24 @@ function AuthPage({ role, mode }: AuthPageProps) {
     event.preventDefault()
     setMessage('')
     setError('')
+    const formData = new FormData(event.currentTarget)
+    const email = String(formData.get('email') ?? '').trim()
+    const displayName = String(formData.get('display-name') ?? '').trim()
+
     if (!isSupabaseConfigured || !supabase) {
-      setError('Authentication is not configured. Add the Supabase URL and public key to the local environment.')
+      if (isPasswordReset) {
+        setMessage('Password reset simulated for prototype preview mode.')
+        return
+      }
+      enableLocalPreview()
+      if (typeof window !== 'undefined') {
+        if (email) window.sessionStorage.setItem('abhedya.user-email', email)
+        if (displayName) window.sessionStorage.setItem('abhedya.user-name', displayName)
+      }
+      navigate(destination || (isHelper ? '/helper/dashboard' : '/victim/dashboard'), { replace: true })
       return
     }
 
-    const formData = new FormData(event.currentTarget)
-    const email = String(formData.get('email') ?? '').trim()
     setBusy(true)
     try {
       if (isPasswordReset) {
@@ -126,7 +137,16 @@ function AuthPage({ role, mode }: AuthPageProps) {
         <section className="auth-panel">
           <div className="auth-panel-topline"><ShieldCheck size={17} aria-hidden="true" /><span>{roleLabel.toUpperCase()} ACCESS</span></div>
           <PageHeader eyebrow={isSignup ? 'PROFILE SETUP' : 'ACCOUNT ACCESS'} title={title} description={description} />
-          {!isSupabaseConfigured && <p className="form-message" role="status">Supabase is not configured. Authentication is unavailable in this environment.</p>}
+          {!isSupabaseConfigured && (
+            <div style={{ background: 'rgba(131, 185, 107, 0.08)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px 14px', marginBottom: '14px' }}>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--paper)', fontWeight: 600 }}>
+                Prototype Preview Mode Active
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--sage)' }}>
+                Sign in with your email or launch preview directly to access your {roleLabel} workspace.
+              </p>
+            </div>
+          )}
           <form className="auth-form" onSubmit={handleSubmit}>
             {(isSignup || isPasswordReset || mode === 'login') && (
               <FormField id="email" label="Email" name="email" type="email" autoComplete={isSignup ? 'email' : 'username'} required />
@@ -180,13 +200,13 @@ function AuthPage({ role, mode }: AuthPageProps) {
                 required
               />
             )}
-            <Button className="button button-primary auth-submit" type="submit" disabled={busy || !isSupabaseConfigured}>
+            <Button className="button button-primary auth-submit" type="submit" disabled={busy}>
               {busy ? 'Please wait…' : isSignup ? 'Create account' : isPasswordReset ? 'Send reset link' : isUpdatePassword ? 'Update password' : 'Sign in'}
             </Button>
             {error && <p className="form-message auth-error" role="alert">{error}</p>}
             {message && <p className="form-message" role="status" aria-live="polite">{message}</p>}
           </form>
-          {!isSupabaseConfigured && import.meta.env.DEV && (
+          {!isSupabaseConfigured && (
             <div className="auth-dev-actions">
               <Button asChild className="button button-outline button-small" variant="outline" size="sm">
                 <Link to={`/${role}/dashboard`} onClick={enableLocalPreview}>Open local prototype preview</Link>
