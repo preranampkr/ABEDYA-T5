@@ -3,6 +3,7 @@ import { divIcon, type LatLngTuple } from 'leaflet'
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertCircle,
   AlertTriangle,
   Building2,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   MapPin,
   Radio,
   Shield,
+  ShieldAlert,
   Users,
   Volume2,
   Waves,
@@ -23,8 +25,8 @@ import { Button } from '../../components/ui/button'
 import { sampleCamps } from '../punarjeev/data/sampleCamps'
 import type { ReliefCamp } from '../punarjeev/types'
 
-export type ThreatType = 'flood' | 'collapse' | 'medical' | 'trapped'
-export type ElevationType = 'trapped_roof' | 'rescued_safe'
+export type ThreatType = 'flood' | 'collapse' | 'medical' | 'trapped' | 'other'
+export type ElevationType = 'trapped_roof' | 'rescued_safe' | 'other'
 
 export interface GeoTrackedCoords {
   latitude: number
@@ -36,7 +38,12 @@ export interface GeoTrackedCoords {
 }
 
 interface SosBeaconProps {
-  onTriggerSos: (threat: ThreatType, elevation: ElevationType, coords?: GeoTrackedCoords) => Promise<void>
+  onTriggerSos: (
+    threat: ThreatType,
+    elevation: ElevationType,
+    coords?: GeoTrackedCoords,
+    customThreatText?: string,
+  ) => Promise<void>
   isBroadcasting?: boolean
   broadcastId?: string | null
   onCancelBroadcast?: () => void
@@ -323,6 +330,7 @@ export default function SosBeacon({
   onCancelBroadcast,
 }: SosBeaconProps) {
   const [selectedThreat, setSelectedThreat] = useState<ThreatType>('flood')
+  const [customThreat, setCustomThreat] = useState('')
   const [elevationStatus, setElevationStatus] = useState<ElevationType>('trapped_roof')
   const [holdProgress, setHoldProgress] = useState(0)
   const [isHolding, setIsHolding] = useState(false)
@@ -573,7 +581,7 @@ export default function SosBeacon({
           navigator.vibrate([200, 100, 200, 100, 500])
         }
 
-        void onTriggerSos(selectedThreat, elevationStatus, coords)
+        void onTriggerSos(selectedThreat, elevationStatus, coords, customThreat)
       }
     }, 40)
   }
@@ -1279,7 +1287,60 @@ export default function SosBeacon({
               <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Trapped Indoors</span>
             </div>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedThreat('other')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              background: selectedThreat === 'other' ? 'rgba(185, 242, 158, 0.2)' : 'var(--panel)',
+              border: selectedThreat === 'other' ? '1px solid var(--tactical)' : '1px solid var(--border)',
+              color: 'var(--paper)',
+              textAlign: 'left',
+              cursor: 'pointer',
+              gridColumn: 'span 2',
+            }}
+          >
+            <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertCircle size={18} style={{ color: 'var(--primary-fixed)' }} aria-hidden="true" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: '13px', fontWeight: 700 }}>Other Threat</span>
+              <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Specify Custom Emergency / Hazard</span>
+            </div>
+            {selectedThreat === 'other' && (
+              <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', fontWeight: 800, background: 'rgba(158, 213, 132, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                ACTIVE
+              </span>
+            )}
+          </button>
         </div>
+
+        {selectedThreat === 'other' && (
+          <div style={{ marginTop: '2px' }}>
+            <input
+              type="text"
+              value={customThreat}
+              onChange={(e) => setCustomThreat(e.target.value)}
+              placeholder="Describe emergency situation (e.g. Landslide, live electrical cable, fire, animal hazard, cut off without food)"
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '9px 12px',
+                fontSize: '12px',
+                borderRadius: '6px',
+                background: 'rgba(0,0,0,0.4)',
+                border: '1px solid var(--tactical)',
+                color: 'var(--paper)',
+                outline: 'none',
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Real-time Location Elevation & Status Segmented Toggle */}
@@ -1301,18 +1362,18 @@ export default function SosBeacon({
           <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)' }}>BAROMETER +6.2M</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '8px' }}>
           <button
             type="button"
             onClick={() => setElevationStatus('trapped_roof')}
             style={{
-              padding: '8px 12px',
+              padding: '8px 10px',
               borderRadius: '6px',
               border: 'none',
               background: elevationStatus === 'trapped_roof' ? 'rgba(147, 0, 10, 0.4)' : 'transparent',
               color: elevationStatus === 'trapped_roof' ? '#ffdad6' : 'var(--sage)',
               fontWeight: 700,
-              fontSize: '12px',
+              fontSize: '11px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1328,13 +1389,13 @@ export default function SosBeacon({
             type="button"
             onClick={() => setElevationStatus('rescued_safe')}
             style={{
-              padding: '8px 12px',
+              padding: '8px 10px',
               borderRadius: '6px',
               border: 'none',
               background: elevationStatus === 'rescued_safe' ? 'var(--tactical)' : 'transparent',
               color: elevationStatus === 'rescued_safe' ? '#0d3900' : 'var(--sage)',
               fontWeight: 700,
-              fontSize: '12px',
+              fontSize: '11px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1342,8 +1403,30 @@ export default function SosBeacon({
               cursor: 'pointer',
             }}
           >
-            <CheckCircle2 size={14} aria-hidden="true" />
+            <CheckCircle2 size={14} style={{ color: elevationStatus === 'rescued_safe' ? '#0d3900' : 'var(--tactical)' }} aria-hidden="true" />
             <span>I am Rescued / Safe</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setElevationStatus('other')}
+            style={{
+              padding: '8px 10px',
+              borderRadius: '6px',
+              border: 'none',
+              background: elevationStatus === 'other' ? 'rgba(245, 189, 88, 0.25)' : 'transparent',
+              color: elevationStatus === 'other' ? '#ffdeaa' : 'var(--sage)',
+              fontWeight: 700,
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            <ShieldAlert size={14} style={{ color: elevationStatus === 'other' ? '#ffdeaa' : 'var(--accent-amber)' }} aria-hidden="true" />
+            <span>Other / Ground Floor</span>
           </button>
         </div>
       </div>

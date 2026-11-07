@@ -251,9 +251,10 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
   }
 
   async function handleTriggerSosBeacon(
-    threat: 'flood' | 'collapse' | 'medical' | 'trapped',
-    elevation: 'trapped_roof' | 'rescued_safe',
+    threat: 'flood' | 'collapse' | 'medical' | 'trapped' | 'other',
+    elevation: 'trapped_roof' | 'rescued_safe' | 'other',
     coords?: GeoTrackedCoords,
+    customThreatText?: string,
   ) {
     setActionBusy(true)
     setLoadError('')
@@ -265,7 +266,9 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
           ? 'Structural Collapse'
           : threat === 'medical'
           ? 'Medical Emergency'
-          : 'Trapped Civilians'
+          : threat === 'trapped'
+          ? 'Trapped Civilians'
+          : customThreatText?.trim() || 'Other Emergency Hazard'
 
       const sosDraft: SanketReportDraft = {
         reportType: 'sos',
@@ -276,7 +279,9 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
             ? 'damaged_infrastructure'
             : threat === 'medical'
             ? 'medical_assistance'
-            : 'shelter_required',
+            : threat === 'trapped'
+            ? 'shelter_required'
+            : 'other',
         urgency: 'critical',
         location: {
           label: coords ? `Citizen Live GPS Fix (±${coords.accuracy}m)` : 'Citizen LoRa Mesh Anchor (RTK-FIX)',
@@ -288,8 +293,12 @@ function SanketPage({ role = 'victim' }: { role?: 'victim' | 'helper' }) {
           source: 'device',
         },
         summary: `EMERGENCY SOS BEACON: ${threatLabel.toUpperCase()}`,
-        details: `3-Second Instant Beacon Broadcast. Elevation: ${
-          elevation === 'trapped_roof' ? 'Trapped on Roof (L+2)' : 'Rescued/Safe'
+        details: `3-Second Instant Beacon Broadcast. Threat: ${threatLabel}. Elevation: ${
+          elevation === 'trapped_roof'
+            ? 'Trapped on Roof (L+2)'
+            : elevation === 'rescued_safe'
+            ? 'Rescued/Safe'
+            : 'Other Elevation / Ground Level'
         }. GNSS Position: ${coords?.latitude ?? 13.3408}° N, ${coords?.longitude ?? 74.7421}° E (±${coords?.accuracy ?? 2}m). Zero-data payload transmitted via LoRa mesh relay.`,
         reporter: {
           name: 'Citizen Beacon Caller',
