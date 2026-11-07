@@ -629,135 +629,173 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
 
           <section className="drishti-map-panel" aria-label="Interactive district map">
             <div className="drishti-map-toolbar">
-              <div><span className="drishti-map-live-dot" /><span>GEOSPATIAL VIEW</span><span className="drishti-map-separator">/</span><strong>{selectedGeography}</strong></div>
-              <div className="drishti-map-toolbar-right"><span>BOUNDARY {boundaryState === 'ready' ? 'LOADED' : boundaryState.toUpperCase()}</span><ChevronDown size={14} aria-hidden="true" /></div>
-            </div>
-
-            {/* Flash notification for newly received emergency lock */}
-            {newEmergencyAlert && (
-              <div
-                style={{
-                  background: '#93000a',
-                  borderBottom: '1px solid #ffb4ab',
-                  color: '#ffdad6',
-                  padding: '6px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  zIndex: 500,
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Siren size={16} />
-                  <span>🚨 NEW EMERGENCY SOS LOCK: {newEmergencyAlert.reporter.name} ({newEmergencyAlert.location.locality})</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFlyTarget([newEmergencyAlert.location.latitude ?? 13.3408, newEmergencyAlert.location.longitude ?? 74.7421])
-                    setShowEmergencyVictims(true)
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    color: '#93000a',
-                    fontWeight: 800,
-                    border: 'none',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  FLY TO LOCATION
-                </button>
-              </div>
-            )}
-
-            {/* Live Emergency Victim Beacons Ticker / HUD */}
-            {emergencyVictims.length > 0 && (
-              <div
-                style={{
-                  background: 'linear-gradient(90deg, rgba(147, 0, 10, 0.88) 0%, rgba(8, 22, 15, 0.95) 100%)',
-                  borderBottom: '1px solid var(--accent-coral)',
-                  padding: '5px 10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                  zIndex: 400,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div>
+                <span className="drishti-map-live-dot" />
+                <span>GEOSPATIAL VIEW</span>
+                <span className="drishti-map-separator">/</span>
+                <strong>{selectedGeography}</strong>
+                {emergencyVictims.length > 0 && (
                   <span
                     style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: '#ffb4ab',
-                      display: 'inline-block',
-                      boxShadow: '0 0 8px #ffb4ab',
+                      marginLeft: '6px',
+                      background: '#93000a',
+                      color: '#ffdad6',
+                      border: '1px solid #ffb4ab',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                      fontSize: '8px',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
-                  />
-                  <strong style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: '#ffdad6', letterSpacing: '0.04em' }}>
-                    🚨 LIVE SOS BEACONS ({emergencyVictims.length} ACTIVE)
-                  </strong>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {emergencyVictims.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => {
-                        setFlyTarget([v.location.latitude ?? 13.3408, v.location.longitude ?? 74.7421])
-                        setShowEmergencyVictims(true)
-                      }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        border: '1px solid #ffb4ab',
-                        color: '#ffdad6',
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                        padding: '2px 8px',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <LocateFixed size={11} />
-                      {v.reporter.name.split(' ')[0]}: {v.location.locality}
-                    </button>
-                  ))}
-                  {flyTarget && (
-                    <button
-                      type="button"
-                      onClick={() => setFlyTarget(null)}
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--border)',
-                        color: 'var(--sage)',
-                        fontSize: '9px',
-                        fontFamily: 'var(--font-mono)',
-                        padding: '2px 6px',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      RESET VIEW
-                    </button>
-                  )}
-                </div>
+                  >
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#ffb4ab' }} />
+                    {emergencyVictims.length} SOS ACTIVE
+                  </span>
+                )}
               </div>
-            )}
+              <div className="drishti-map-toolbar-right">
+                <span>BOUNDARY {boundaryState === 'ready' ? 'LOADED' : boundaryState.toUpperCase()}</span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </div>
+            </div>
 
             <div className="drishti-map-canvas">
+              {/* Flash notification for newly received emergency lock */}
+              {newEmergencyAlert && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#93000a',
+                    border: '1px solid #ffb4ab',
+                    color: '#ffdad6',
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    zIndex: 1000,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+                  }}
+                >
+                  <Siren size={15} />
+                  <span>🚨 NEW SOS BEACON: {newEmergencyAlert.reporter.name} ({newEmergencyAlert.location.locality})</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFlyTarget([newEmergencyAlert.location.latitude ?? 13.3408, newEmergencyAlert.location.longitude ?? 74.7421])
+                      setShowEmergencyVictims(true)
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      color: '#93000a',
+                      fontWeight: 800,
+                      border: 'none',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                    }}
+                  >
+                    FLY TO LOCATION
+                  </button>
+                </div>
+              )}
+
+              {/* Live Emergency Victim Beacons Ticker Floating Overlay */}
+              {emergencyVictims.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(8, 22, 15, 0.92)',
+                    border: '1px solid #ffb4ab',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    zIndex: 900,
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                    maxWidth: 'calc(100% - 240px)',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: '#ffb4ab',
+                        display: 'inline-block',
+                        boxShadow: '0 0 6px #ffb4ab',
+                      }}
+                    />
+                    <strong style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: '#ffdad6', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                      🚨 SOS ({emergencyVictims.length})
+                    </strong>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    {emergencyVictims.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setFlyTarget([v.location.latitude ?? 13.3408, v.location.longitude ?? 74.7421])
+                          setShowEmergencyVictims(true)
+                        }}
+                        style={{
+                          background: 'rgba(147, 0, 10, 0.7)',
+                          border: '1px solid #ffb4ab',
+                          color: '#ffdad6',
+                          fontSize: '8px',
+                          fontWeight: 700,
+                          fontFamily: 'var(--font-mono)',
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <LocateFixed size={10} />
+                        {v.reporter.name.split(' ')[0]}: {v.location.locality}
+                      </button>
+                    ))}
+                    {flyTarget && (
+                      <button
+                        type="button"
+                        onClick={() => setFlyTarget(null)}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid var(--border)',
+                          color: 'var(--sage)',
+                          fontSize: '8px',
+                          fontFamily: 'var(--font-mono)',
+                          padding: '2px 5px',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        RESET
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {boundaryState === 'loading' && <div className="drishti-map-state"><Database size={21} /><strong>Loading verified boundary</strong><span>Retrieving the local district reference file.</span></div>}
               {boundaryState === 'error' && <div className="drishti-map-state drishti-map-error"><AlertTriangle size={21} /><strong>District geometry unavailable</strong><span>{boundaryError}</span></div>}
               {boundaryState === 'ready' && boundary && mapExtent && (
