@@ -129,10 +129,12 @@ function AuthPage({ role, mode }: AuthPageProps) {
 
   return (
     <div className="public-page auth-page">
-      <header className="site-header content-width">
-        <Brand />
-        <Link className="text-action" to="/roles"><ArrowLeft size={15} aria-hidden="true" /> Change role</Link>
-      </header>
+      <div className="site-header-bar">
+        <header className="site-header content-width">
+          <Brand />
+          <Link className="text-action" to="/roles"><ArrowLeft size={15} aria-hidden="true" /> Change role</Link>
+        </header>
+      </div>
       <main className="auth-main content-width">
         <section className="auth-panel">
           <div className="auth-panel-topline"><ShieldCheck size={17} aria-hidden="true" /><span>{roleLabel.toUpperCase()} ACCESS</span></div>
