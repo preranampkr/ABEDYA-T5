@@ -7,8 +7,8 @@ import { Button } from '../components/ui/button'
 function LandingPage() {
   return (
     <div className="public-page landing-page">
-      <SiteHeader />
-      <main>
+      <div className="landing-hero-backdrop">
+        <SiteHeader />
         <section className="landing-hero content-width">
           <div className="landing-copy">
             <p className="eyebrow"><span className="eyebrow-rule" /> FLOOD DISASTER INTELLIGENCE</p>
@@ -51,6 +51,9 @@ function LandingPage() {
             <p className="framework-footnote">A platform foundation · No live feeds connected</p>
           </aside>
         </section>
+      </div>
+
+      <main>
 
         <div className="section-divider content-width"><span>IMMEDIATE ASSISTANCE</span><span>01 / 02</span></div>
 
