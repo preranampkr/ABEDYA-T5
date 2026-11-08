@@ -161,47 +161,57 @@ button { color: inherit; }
 .eyebrow-rule { width: 22px; height: 1px; display: inline-block; margin: 0 8px 3px 0; background: var(--tactical); }
 .landing-hero-backdrop {
   position: relative;
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(8, 22, 15, 0.72) 0%,
-      rgba(8, 22, 15, 0.76) 30%,
-      rgba(8, 22, 15, 0.88) 75%,
-      #08160f 100%
-    ),
-    linear-gradient(
-      90deg,
-      rgba(8, 22, 15, 0.94) 0%,
-      rgba(8, 22, 15, 0.82) 48%,
-      rgba(8, 22, 15, 0.62) 80%,
-      rgba(8, 22, 15, 0.85) 100%
-    ),
-    url('/images/flood-rescue-hero.jpg');
+  background-color: #08160f;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.landing-hero-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/flood-rescue-hero.jpg');
   background-size: cover;
   background-position: center 30%;
   background-repeat: no-repeat;
-  border-bottom: 1px solid var(--border);
+  filter: brightness(0.95) contrast(1.08) saturate(1.15);
+  pointer-events: none;
+  z-index: 0;
 }
-.landing-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr); gap: 72px; align-items: center; padding-block: 76px 70px; }
-.landing-tagline { margin: 27px 0 9px; color: var(--tactical); font-family: var(--font-display); font-size: 15px; font-weight: 700; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6); }
+.landing-hero-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 22, 15, 0.25) 0%, rgba(8, 22, 15, 0) 30%, rgba(8, 22, 15, 0.25) 65%, rgba(8, 22, 15, 0.82) 88%, #08160f 100%),
+    linear-gradient(90deg, rgba(8, 22, 15, 0.88) 0%, rgba(8, 22, 15, 0.6) 38%, rgba(8, 22, 15, 0.05) 65%, rgba(8, 22, 15, 0.2) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.landing-hero-backdrop > * {
+  position: relative;
+  z-index: 2;
+}
+.landing-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr); gap: 72px; align-items: center; padding-block: 80px 84px; }
+.landing-tagline { margin: 27px 0 9px; color: var(--tactical); font-family: var(--font-display); font-size: 15px; font-weight: 700; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8); }
 .landing-copy h1, .not-found-content h1 {
   max-width: 690px;
   margin: 0;
-  color: var(--paper);
+  color: #ffffff;
   font-family: var(--font-display);
   font-size: 54px;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1.08;
   letter-spacing: 0;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.8), 0 1px 4px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(0, 0, 0, 0.95);
 }
-.landing-intro { max-width: 580px; margin: 21px 0 0; color: #d6e7da; font-size: 15px; line-height: 1.75; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7); }
+.landing-intro { max-width: 580px; margin: 21px 0 0; color: #e2ede4; font-size: 15px; line-height: 1.75; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8); }
 .landing-actions { display: flex; flex-wrap: wrap; gap: 11px; margin-top: 28px; }
 .landing-hero .button-quiet {
   background: rgba(8, 22, 15, 0.65);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-color: rgba(140, 147, 133, 0.4);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 .landing-hero .button-quiet:hover {
   background: rgba(8, 22, 15, 0.9);
@@ -210,11 +220,11 @@ button { color: inherit; }
 }
 .response-framework {
   padding: 22px 24px 18px;
-  border: 1px solid rgba(158, 213, 132, 0.3);
-  background: rgba(14, 28, 20, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(158, 213, 132, 0.35);
+  background: rgba(14, 28, 20, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .framework-heading { display: flex; align-items: center; gap: 10px; padding-bottom: 17px; border-bottom: 1px solid var(--border); color: var(--sage); font-size: 10px; font-weight: 700; letter-spacing: 0.07em; }
 .framework-icon {
