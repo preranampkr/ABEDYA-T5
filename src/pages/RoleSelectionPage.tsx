@@ -6,11 +6,13 @@ import { Button } from '../components/ui/button'
 
 function RoleSelectionPage() {
   return (
-    <div className="public-page">
-      <header className="site-header content-width role-header">
-        <Brand />
-        <Link className="site-nav-link" to="/">Back to overview</Link>
-      </header>
+    <div className="public-page role-selection-page">
+      <div className="site-header-bar">
+        <header className="site-header content-width role-header">
+          <Brand />
+          <Link className="site-nav-link" to="/">Back to overview</Link>
+        </header>
+      </div>
       <main className="role-page content-width">
         <PageHeader
           eyebrow="PLATFORM ACCESS / SELECT A ROLE"
