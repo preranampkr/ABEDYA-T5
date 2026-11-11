@@ -414,7 +414,7 @@ function DashboardLayout({ role, title, description, eyebrow, wide = false, hide
                         </Link>
 
                         <Link
-                          to="/helper/sena"
+                          to={`/helper/sena?incident=${dispatch.reportId}`}
                           style={{
                             background: 'rgba(245, 189, 88, 0.15)',
                             border: '1px solid var(--accent-amber)',

@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowDownToLine,
-  BatteryCharging,
   CheckCircle2,
+  ExternalLink,
   Filter,
   LifeBuoy,
   MapPin,
+  Navigation,
   Phone,
   Radio,
   RefreshCw,
@@ -19,12 +21,41 @@ import {
 import DashboardLayout from '../../components/DashboardLayout'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
-import ResponseMap from './ResponseMap'
+import ResponseMap, { type BoundaryInput, type DistrictBoundary } from './ResponseMap'
 import { senaRepository } from './data/repository'
 import { capabilityLabels, getUnitMatchScore } from './data/responseUnits'
 import type { ResponseUnit, SenaDispatchStatus, SenaIncidentItem } from './types'
 import type { MedhaPriority } from '../medha/data/intelligence'
+import { reportRepository } from '../sanket/data/reportRepository'
 import './sena.css'
+
+function getIncidentHazardAdvisory(incident: SenaIncidentItem): { title: string; detail: string } {
+  const loc = incident.location?.locality || incident.location?.label || incident.location?.taluk || 'reported sector'
+  switch (incident.category) {
+    case 'flooding':
+    case 'waterlogging':
+      return {
+        title: `FLOOD SURGE ADVISORY // ${incident.urgency.toUpperCase()}`,
+        detail: `Water rescue equipment & swift-water PPE recommended near ${loc}.`,
+      }
+    case 'medical_assistance':
+      return {
+        title: `MEDICAL EXTRACTION // ${incident.urgency.toUpperCase()}`,
+        detail: `Paramedic trauma kit & ambulance staging advised for ${loc}.`,
+      }
+    case 'blocked_road':
+    case 'damaged_infrastructure':
+      return {
+        title: `ACCESS OBSTRUCTION // ${incident.urgency.toUpperCase()}`,
+        detail: `Heavy clearance & rerouting required around ${loc}.`,
+      }
+    default:
+      return {
+        title: `FIELD RESPONSE ADVISORY // ${incident.urgency.toUpperCase()}`,
+        detail: `Verify local terrain access and evacuation corridor at ${loc}.`,
+      }
+  }
+}
 
 async function fetchSenaData() {
   const [incidentList, unitList] = await Promise.all([
@@ -35,10 +66,13 @@ async function fetchSenaData() {
 }
 
 export default function SenaPage() {
+  const [searchParams] = useSearchParams()
+  const incidentQueryParam = searchParams.get('incident') || searchParams.get('track') || searchParams.get('id')
+
   const [incidents, setIncidents] = useState<SenaIncidentItem[]>([])
   const [units, setUnits] = useState<ResponseUnit[]>([])
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
-  const [boundary, setBoundary] = useState<any | null>(null)
+  const [boundary, setBoundary] = useState<DistrictBoundary | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
@@ -60,30 +94,61 @@ export default function SenaPage() {
   // Resolution modal inputs
   const [rescuedCountInput, setRescuedCountInput] = useState<number>(0)
   const [resolutionNote, setResolutionNote] = useState('')
+  const [mapFocusNonce, setMapFocusNonce] = useState(0)
+
+  const commandPanelRef = useRef<HTMLElement | null>(null)
+  const missionBriefRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const focusCommandPanel = useCallback(() => {
+    commandPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    setTimeout(() => {
+      missionBriefRef.current?.focus()
+    }, 180)
+  }, [])
 
   // Load geojson boundary
   useEffect(() => {
-    fetch('/data/drishti/udupi-district.geojson')
+    const controller = new AbortController()
+    fetch('/data/drishti/udupi-district.geojson', { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error('Could not load district boundary')
-        return res.json()
+        return res.json() as Promise<BoundaryInput>
       })
-      .then((data) => setBoundary(data))
+      .then((data) => {
+        if ('features' in data && Array.isArray(data.features)) {
+          const feature =
+            data.features.find((item) => item?.properties?.shapeID === '76128533B4839184447445') ??
+            data.features[0] ??
+            null
+          setBoundary(feature)
+          return
+        }
+        if ('geometry' in data && data.geometry) {
+          setBoundary(data)
+        }
+      })
       .catch(() => {
         // Fallback gracefully without boundary
       })
+    return () => controller.abort()
   }, [])
 
-  const applyData = useCallback(({ incidentList, unitList }: { incidentList: SenaIncidentItem[]; unitList: ResponseUnit[] }) => {
-    setErrorMessage(null)
-    setIncidents(incidentList)
-    setUnits(unitList)
-    setSelectedIncidentId((current) =>
-      current && incidentList.some((item) => item.id === current)
-        ? current
-        : incidentList[0]?.id ?? null,
-    )
-  }, [])
+  const applyData = useCallback(
+    ({ incidentList, unitList }: { incidentList: SenaIncidentItem[]; unitList: ResponseUnit[] }) => {
+      setErrorMessage(null)
+      setIncidents(incidentList)
+      setUnits(unitList)
+      setSelectedIncidentId((current) => {
+        if (incidentQueryParam && incidentList.some((item) => item.id === incidentQueryParam)) {
+          return incidentQueryParam
+        }
+        return current && incidentList.some((item) => item.id === current)
+          ? current
+          : incidentList[0]?.id ?? null
+      })
+    },
+    [incidentQueryParam],
+  )
 
   const loadData = useCallback(() => {
     return fetchSenaData()
@@ -112,14 +177,31 @@ export default function SenaPage() {
     }
   }, [applyData])
 
+  // Real-time synchronization when emergency SOS beacons are triggered
+  useEffect(() => {
+    const unsubscribeEmergency = reportRepository.subscribeEmergency((notification) => {
+      void loadData().then(() => {
+        if (notification.reportId) {
+          setSelectedIncidentId(notification.reportId)
+        }
+      })
+    })
+    return unsubscribeEmergency
+  }, [loadData])
+
   const handleRefresh = () => {
     setIsRefreshing(true)
     void loadData()
   }
 
   const selectedIncident = useMemo(() => {
-    return incidents.find((i) => i.id === selectedIncidentId) ?? null
-  }, [incidents, selectedIncidentId])
+    const targetId =
+      selectedIncidentId ||
+      (incidentQueryParam && incidents.some((i) => i.id === incidentQueryParam)
+        ? incidentQueryParam
+        : null)
+    return incidents.find((i) => i.id === (targetId || incidents[0]?.id)) ?? null
+  }, [incidents, incidentQueryParam, selectedIncidentId])
 
   // Filtered incidents
   const filteredIncidents = useMemo(() => {
@@ -129,9 +211,9 @@ export default function SenaPage() {
       if (statusFilter !== 'all' && currentStatus !== statusFilter) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
-        const matchTitle = incident.summary.toLowerCase().includes(q)
-        const matchLoc = incident.location.label.toLowerCase().includes(q)
-        const matchTaluk = incident.location.taluk?.toLowerCase().includes(q)
+        const matchTitle = (incident.summary || '').toLowerCase().includes(q)
+        const matchLoc = (incident.location?.label || incident.location?.locality || '').toLowerCase().includes(q)
+        const matchTaluk = (incident.location?.taluk || '').toLowerCase().includes(q)
         if (!matchTitle && !matchLoc && !matchTaluk) return false
       }
       return true
@@ -158,6 +240,12 @@ export default function SenaPage() {
         return { unit, score, matchedCapabilities }
       })
       .sort((a, b) => b.score - a.score)
+  }, [selectedIncident, units])
+
+  const activeSelectedId = selectedIncident?.id ?? null
+  const assignedUnit = useMemo(() => {
+    if (!selectedIncident?.activeDispatch) return null
+    return units.find((u) => u.id === selectedIncident.activeDispatch?.unitId) ?? null
   }, [selectedIncident, units])
 
   // Handle Dispatch
@@ -281,6 +369,8 @@ export default function SenaPage() {
       title="SENA"
       description="Incident review, response dispatch, and field operation coordination."
       eyebrow="HELPER WORKSPACE / SENA RESPONSE COMMAND"
+      wide
+      hidePageHeader
     >
       <div className="sena-workspace">
         {/* Topbar */}
@@ -312,21 +402,22 @@ export default function SenaPage() {
           </div>
         </section>
 
-        {/* Emergency Operations Banner: Top Tactical Edge */}
+        {/* Live Emergency Operations Banner */}
         <div className="sena-ops-banner">
           <div className="sena-ops-banner-left">
             <span className="sena-ping-dot" />
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-              RED-ALERT // SURGE PHASE-3
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {metrics.criticalPending > 0
+                ? `PRIORITY DISPATCH ALERT // ${metrics.criticalPending} CRITICAL INCIDENT${metrics.criticalPending > 1 ? 'S' : ''} AWAITING SAR`
+                : 'SECTOR COMMAND ACTIVE // ALL CRITICAL INCIDENTS ASSIGNED OR RESOLVED'}
             </span>
-            <span style={{ fontSize: '11px', opacity: 0.9 }}>• FLOODWATER PEAK IN T-45M</span>
           </div>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800, background: '#04110a', padding: '2px 8px', borderRadius: '4px', color: '#ffb4ab' }}>
-            CRIT-4
+            {metrics.criticalPending > 0 ? `CRIT-${metrics.criticalPending}` : `${metrics.total} TRACKED`}
           </span>
         </div>
 
-        {/* Active Unit Telemetry Header */}
+        {/* Live Unit Telemetry Strip tied to selected dispatch or fleet readiness */}
         <div className="sena-unit-telemetry-strip">
           <div className="sena-unit-telemetry-top">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -335,16 +426,22 @@ export default function SenaPage() {
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 800, fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
-                  UNIT-NDRF-01
+                  {assignedUnit ? `${assignedUnit.id} • ${assignedUnit.callSign.toUpperCase()}` : 'UDUPI SECTOR FORCE READINESS'}
                 </span>
                 <span style={{ fontSize: '10px', color: 'var(--sage)', fontFamily: 'var(--font-mono)' }}>
-                  ALPHA TEAM • COMMAND BOAT 02 • DISPATCH CONTROL
+                  {assignedUnit
+                    ? `${assignedUnit.name} • ${assignedUnit.leader} • ${assignedUnit.personnelCount} CREW`
+                    : `${metrics.availableUnits} Units on Standby • ${metrics.deployedUnits} Units Actively Deployed`}
                 </span>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(131, 185, 107, 0.15)', color: 'var(--tactical)', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--tactical)' }} />
-              <span>DEPLOYED ON SCENE</span>
+              <span>
+                {selectedIncident?.activeDispatch
+                  ? selectedIncident.activeDispatch.status.replace('_', ' ').toUpperCase()
+                  : 'DISPATCH READY'}
+              </span>
             </div>
           </div>
 
@@ -352,18 +449,18 @@ export default function SenaPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Radio size={16} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
               <div>
-                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>COMMS FREQ</span>
-                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)', fontWeight: 700 }}>VHF 156.800 MHz (CH-04)</span>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', display: 'block' }}>ACTIVE CHANNEL</span>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)', fontWeight: 700 }}>
+                  {assignedUnit ? `${assignedUnit.agency} NET • ${assignedUnit.phone}` : 'UDUPI DDMA VHF CH-04'}
+                </span>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Wifi size={14} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
-                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', fontWeight: 700 }}>5/5 BARS</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <BatteryCharging size={14} style={{ color: 'var(--accent-amber)' }} aria-hidden="true" />
-                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)', fontWeight: 700 }}>84%</span>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)', fontWeight: 700 }}>
+                  {units.length} UNITS TRACKED
+                </span>
               </div>
             </div>
           </div>
@@ -436,6 +533,7 @@ export default function SenaPage() {
                     { id: 'all', label: 'All Stages' },
                     { id: 'pending_dispatch', label: 'Pending' },
                     { id: 'dispatched', label: 'Dispatched' },
+                    { id: 'en_route', label: 'En Route' },
                     { id: 'on_scene', label: 'On Scene' },
                     { id: 'resolved', label: 'Resolved' },
                   ] as const
@@ -444,7 +542,7 @@ export default function SenaPage() {
                     key={st.id}
                     type="button"
                     className={`sena-pill-btn ${statusFilter === st.id ? 'active' : ''}`}
-                    onClick={() => setStatusFilter(st.id as any)}
+                    onClick={() => setStatusFilter(st.id)}
                   >
                     {st.label}
                   </button>
@@ -457,7 +555,7 @@ export default function SenaPage() {
                 <p className="no-reports-message">No incidents match the selected filters.</p>
               ) : (
                 filteredIncidents.map((incident) => {
-                  const isSelected = incident.id === selectedIncidentId
+                  const isSelected = incident.id === activeSelectedId
                   const currentStatus = incident.activeDispatch?.status ?? 'pending_dispatch'
                   return (
                     <button
@@ -467,7 +565,15 @@ export default function SenaPage() {
                       onClick={() => setSelectedIncidentId(incident.id)}
                     >
                       <div className="sena-card-top">
-                        <span className="sena-card-id">{incident.id}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {incident.reportType === 'sos' && (
+                            <span className="sena-live-beacon-pill">
+                              <span className="sena-ping-dot" style={{ width: '6px', height: '6px' }} />
+                              LIVE SOS
+                            </span>
+                          )}
+                          <span className="sena-card-id">{incident.id}</span>
+                        </div>
                         <Badge
                           variant="outline"
                           className={`badge priority-badge ${incident.priority}`}
@@ -480,7 +586,7 @@ export default function SenaPage() {
 
                       <div className="sena-card-meta">
                         <MapPin size={12} aria-hidden="true" />
-                        <span>{incident.location.label}, {incident.location.taluk}</span>
+                        <span>{incident.location?.label || incident.location?.locality || 'Field Sector'}, {incident.location?.taluk || incident.location?.district || 'Udupi'}</span>
                       </div>
 
                       <div className="sena-needs-tags">
@@ -493,7 +599,7 @@ export default function SenaPage() {
 
                       <div className={`sena-dispatch-badge ${currentStatus}`}>
                         {currentStatus.replace('_', ' ')}
-                        {incident.activeDispatch?.unitName ? ` &bull; ${incident.activeDispatch.unitName.split('-')[0]}` : ''}
+                        {incident.activeDispatch?.unitName ? ` • ${incident.activeDispatch.unitName.split('-')[0].trim()}` : ''}
                       </div>
                     </button>
                   )
@@ -507,10 +613,10 @@ export default function SenaPage() {
                 <Radio size={16} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
                 <div>
                   <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
-                    TEAM STATUS PULSE
+                    FLEET STATUS PULSE
                   </span>
                   <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--paper)', fontWeight: 700 }}>
-                    4 RESPONDERS TELEMETRY OK
+                    {units.length} UNITS TRACKED • {metrics.availableUnits} STANDBY
                   </span>
                 </div>
               </div>
@@ -518,7 +624,7 @@ export default function SenaPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setActionSuccess('Telemetry Ping Acknowledged: All 4 responder units linked via LoRa mesh.')}
+                onClick={() => setActionSuccess(`Telemetry Ping Acknowledged: All ${units.length} response units reachable (${metrics.deployedUnits} deployed, ${metrics.availableUnits} standby).`)}
                 style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, height: '30px' }}
               >
                 PING
@@ -530,19 +636,21 @@ export default function SenaPage() {
           <section className="sena-panel sena-map-panel">
             <div className="sena-panel-header">
               <h3><MapPin size={14} aria-hidden="true" /> Tactical Deployment Map</h3>
-              <Badge variant="outline" className="badge">{units.length} Units Active</Badge>
+              <Badge variant="outline" className="badge">{units.length} Units Tracked</Badge>
             </div>
             <ResponseMap
               incidents={filteredIncidents}
               units={units}
-              selectedIncidentId={selectedIncidentId}
+              selectedIncidentId={activeSelectedId}
               boundary={boundary}
+              externalFocusNonce={mapFocusNonce}
               onSelectIncident={(id) => setSelectedIncidentId(id)}
+              onFocusCommand={focusCommandPanel}
             />
           </section>
 
           {/* Column 3: Command & Dispatch Action Panel */}
-          <aside className="sena-panel">
+          <aside className="sena-panel" ref={commandPanelRef}>
             <div className="sena-panel-header">
               <h3><Shield size={14} aria-hidden="true" /> Operational Command</h3>
               {selectedIncident && (
@@ -550,13 +658,23 @@ export default function SenaPage() {
               )}
             </div>
 
-            {selectedIncident ? (
+            {selectedIncident ? (() => {
+              const hazardAdvisory = getIncidentHazardAdvisory(selectedIncident)
+              const trappedOrAffected =
+                selectedIncident.reportedImpacts.peopleTrapped ??
+                selectedIncident.reportedImpacts.peopleAffected
+              const hasCoords = Boolean(selectedIncident.location.latitude && selectedIncident.location.longitude)
+              const navUrl = hasCoords
+                ? `https://www.google.com/maps/dir/?api=1&destination=${selectedIncident.location.latitude},${selectedIncident.location.longitude}`
+                : null
+
+              return (
               <div className="sena-detail-scroll">
                 {/* Incident summary card */}
                 <div className="sena-incident-summary-card sena-primary-mission-card">
                   <div className="sena-glow-line" />
                   <div className="sena-card-top">
-                    <span className="sena-card-id">{selectedIncident.category.toUpperCase()}</span>
+                    <span className="sena-card-id">{selectedIncident.category.replace(/_/g, ' ').toUpperCase()}</span>
                     <Badge
                       variant="outline"
                       className={`badge priority-badge ${selectedIncident.priority}`}
@@ -568,42 +686,49 @@ export default function SenaPage() {
                   <h4>{selectedIncident.summary}</h4>
                   <p className="description-text">{selectedIncident.details}</p>
 
-                  {/* Environmental Threat Warning */}
+                  {/* Incident Hazard Advisory */}
                   <div className="sena-threat-pill">
                     <AlertTriangle size={18} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} aria-hidden="true" />
                     <div>
                       <strong style={{ display: 'block', fontSize: '11px', color: 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        HAZARD: LIVE POWER LINE DOWN / FLOOD SURGE
+                        {hazardAdvisory.title}
                       </strong>
                       <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
-                        Submerged transformer 40m south. Non-contact zone active.
+                        {hazardAdvisory.detail}
                       </span>
                     </div>
                   </div>
 
-                  {/* Tactical Hazard & Souls Matrix */}
+                  {/* Tactical Hazard & Impact Matrix */}
                   <div className="sena-matrix-grid">
                     <div className="sena-matrix-cell">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--sage)', fontSize: '10px' }}>
                         <Shield size={12} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
-                        <span>SOULS IN PERIL</span>
+                        <span>{selectedIncident.reportedImpacts.peopleTrapped ? 'TRAPPED / PERIL' : 'PEOPLE AFFECTED'}</span>
                       </div>
                       <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--paper)' }}>
-                        {selectedIncident.reportedImpacts.peopleTrapped ?? selectedIncident.reportedImpacts.peopleAffected ?? 5} SOULS
+                        {trappedOrAffected !== null ? `${trappedOrAffected} PERSONS` : 'UNREPORTED'}
                       </span>
-                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>2 Minors • 1 Dialysis Patient</span>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
+                        {selectedIncident.reportedImpacts.vulnerablePeople ?? 0} Vulnerable • {selectedIncident.reportedImpacts.reportedInjuries ?? 0} Injured
+                      </span>
                     </div>
 
                     <div className="sena-matrix-cell">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--sage)', fontSize: '10px' }}>
                         <Waves size={12} style={{ color: 'var(--accent-sky)' }} aria-hidden="true" />
-                        <span>WATER LEVEL</span>
+                        <span>SECTOR / GPS FIX</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--accent-coral)' }}>2.1m</span>
-                        <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--accent-coral)' }}>▲ RISING</span>
+                        <span style={{ fontSize: '13px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)' }}>
+                          {hasCoords
+                            ? `${selectedIncident.location.latitude?.toFixed(3)}°N, ${selectedIncident.location.longitude?.toFixed(3)}°E`
+                            : selectedIncident.location.taluk || 'Udupi'}
+                        </span>
                       </div>
-                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>Flow rate: 3.4 knots</span>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
+                        Needs: {selectedIncident.assistanceNeeds.slice(0, 2).join(', ').replace(/_/g, ' ') || 'assessment'}
+                      </span>
                     </div>
                   </div>
 
@@ -639,10 +764,34 @@ export default function SenaPage() {
                     </div>
                   </div>
 
-                  {/* Reporter Contact */}
-                  <div className="sena-card-meta">
-                    <Phone size={13} aria-hidden="true" />
-                    <span>Contact: {selectedIncident.reporterName} ({selectedIncident.reporterPhone})</span>
+                  {/* Reporter Contact & Field Navigation Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div className="sena-card-meta">
+                      <Phone size={13} aria-hidden="true" />
+                      <span>Contact: {selectedIncident.reporterName} ({selectedIncident.reporterPhone})</span>
+                    </div>
+                    {navUrl && (
+                      <a
+                        href={navUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 700,
+                          color: 'var(--accent-sky)',
+                          border: '1px solid rgba(123, 208, 255, 0.35)',
+                          background: 'rgba(123, 208, 255, 0.1)',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        <Navigation size={11} aria-hidden="true" /> ROUTE <ExternalLink size={10} aria-hidden="true" />
+                      </a>
+                    )}
                   </div>
                 </div>
 
@@ -651,7 +800,7 @@ export default function SenaPage() {
                   <form className="sena-dispatch-section" onSubmit={handleDispatch}>
                     <h4><Truck size={14} aria-hidden="true" /> Authorize Team Dispatch</h4>
                     <p style={{ margin: '0', fontSize: '11px', color: 'var(--sage)' }}>
-                      Select a response unit with matching capabilities to mobilize.
+                      Select an available response unit with matching capabilities to mobilize.
                     </p>
 
                     <div className="sena-unit-select-row">
@@ -662,17 +811,19 @@ export default function SenaPage() {
                           <button
                             key={unit.id}
                             type="button"
+                            disabled={!isAvailable}
+                            title={isAvailable ? `Select ${unit.name}` : `Currently deployed to ${unit.assignedIncidentId}`}
                             className={`sena-unit-option-card ${isChosen ? 'chosen' : ''}`}
                             onClick={() => setSelectedUnitId(unit.id)}
                           >
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <div>
                                 <strong>{unit.name}</strong> ({unit.callSign})
                               </div>
                               <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
-                                {unit.personnelCount} personnel &bull; Base: {unit.baseLocation.locality}
+                                {unit.personnelCount} personnel • Base: {unit.baseLocation.locality}
                               </span>
-                              <div style={{ marginTop: '2px', display: 'flex', gap: '3px' }}>
+                              <div style={{ marginTop: '3px', display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
                                 {matchedCapabilities.map((c) => (
                                   <span key={c} className="sena-need-tag">
                                     {capabilityLabels[c]?.label.split(' ')[0] ?? c}
@@ -680,10 +831,10 @@ export default function SenaPage() {
                                 ))}
                               </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
                               <span className="sena-unit-match-score">Match: {score}</span>
-                              <div style={{ fontSize: '10px', color: isAvailable ? 'var(--tactical)' : 'var(--amber)' }}>
-                                {unit.status.toUpperCase()}
+                              <div style={{ fontSize: '10px', marginTop: '3px', color: isAvailable ? 'var(--tactical)' : 'var(--amber)' }}>
+                                {isAvailable ? 'STANDBY' : `BUSY (${unit.assignedIncidentId ?? 'DEPLOYED'})`}
                               </div>
                             </div>
                           </button>
@@ -691,7 +842,28 @@ export default function SenaPage() {
                       })}
                     </div>
 
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--sage)', fontFamily: 'var(--font-mono)' }}>
+                        MISSION BRIEF {selectedUnitId ? '• UNIT READY' : '• PICK A UNIT ABOVE'}
+                      </span>
+                      <button
+                        type="button"
+                        className="sena-pill-btn"
+                        onClick={() => {
+                          const targetLoc = selectedIncident.location?.label || selectedIncident.location?.locality || 'reported sector'
+                          const needsText = selectedIncident.assistanceNeeds.join(', ').replace(/_/g, ' ') || 'rescue & evacuation'
+                          setMissionBrief(
+                            `Proceed immediately to ${targetLoc} (${selectedIncident.location?.taluk || 'Udupi'}) for ${needsText}. Confirm live victim contact on arrival.`,
+                          )
+                          missionBriefRef.current?.focus()
+                        }}
+                      >
+                        Auto-fill Standard Brief
+                      </button>
+                    </div>
+
                     <textarea
+                      ref={missionBriefRef}
                       className="sena-textarea"
                       rows={3}
                       placeholder="Enter tactical mission brief and coordination instructions..."
@@ -705,7 +877,14 @@ export default function SenaPage() {
                       className="button button-primary"
                       disabled={isDispatching || !selectedUnitId || !missionBrief.trim()}
                     >
-                      <Send size={14} aria-hidden="true" /> Mobilize &amp; Issue Dispatch Order
+                      <Send size={14} aria-hidden="true" />
+                      {isDispatching
+                        ? 'Dispatching...'
+                        : !selectedUnitId
+                          ? 'Select a Unit to Dispatch'
+                          : !missionBrief.trim()
+                            ? 'Enter Mission Brief to Mobilize'
+                            : 'Mobilize & Issue Dispatch Order'}
                     </Button>
                   </form>
                 ) : (
@@ -731,7 +910,7 @@ export default function SenaPage() {
                           MISSION LIFECYCLE
                         </span>
                         <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--tactical)' }}>
-                          STAGE: {selectedIncident.activeDispatch.status.toUpperCase()}
+                          STAGE: {selectedIncident.activeDispatch.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </div>
                       <div className="sena-glove-grid">
@@ -769,22 +948,32 @@ export default function SenaPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const coords =
-                            selectedIncident.location.latitude && selectedIncident.location.longitude
-                              ? `${selectedIncident.location.latitude.toFixed(4)}° N, ${selectedIncident.location.longitude.toFixed(4)}° E`
-                              : 'Sector 4'
-                          setActionSuccess(`Offline vector map focused on ${coords}.`)
+                          setMapFocusNonce((n) => n + 1)
+                          const coords = hasCoords
+                            ? `${selectedIncident.location.latitude?.toFixed(4)}° N, ${selectedIncident.location.longitude?.toFixed(4)}° E`
+                            : selectedIncident.location.locality || 'Udupi'
+                          setActionSuccess(`Tactical deployment map centered on ${coords}.`)
                         }}
                         style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700 }}
                       >
-                        OFFLINE MAP
+                        FOCUS MAP
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setActionSuccess('AIRLIFT EXTRACTION TASKED: Indian Coast Guard ALH Helicopter en route.')
+                        onClick={async () => {
+                          try {
+                            await senaRepository.addLog(
+                              selectedIncident.id,
+                              'AIRLIFT EXTRACTION REQUESTED: Aerial support / Coast Guard evacuation tasked.',
+                              'SENA Duty Officer',
+                            )
+                            setActionSuccess('AIRLIFT EXTRACTION REQUESTED & logged to mission timeline.')
+                            await loadData()
+                          } catch {
+                            setActionSuccess('AIRLIFT EXTRACTION REQUESTED: Aerial support notified.')
+                          }
                         }}
                         style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, color: 'var(--accent-amber)' }}
                       >
@@ -861,7 +1050,8 @@ export default function SenaPage() {
                   </div>
                 )}
               </div>
-            ) : (
+              )
+            })() : (
               <div style={{ padding: '30px', textAlign: 'center', color: 'var(--sage)' }}>
                 Select an incident from the queue to review and organize response.
               </div>

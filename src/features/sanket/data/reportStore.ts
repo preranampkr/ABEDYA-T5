@@ -123,6 +123,18 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
+    if (event.key === 'abhedya.sanket.reports' && event.newValue) {
+      try {
+        const stored = JSON.parse(event.newValue) as SanketReport[]
+        for (const rep of stored) {
+          if (!prototypeReports.some((r) => r.id === rep.id)) {
+            prototypeReports.unshift(rep)
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     if (event.key === 'abhedya.sanket.emergency_dispatches' && event.newValue) {
       try {
         const dispatches = JSON.parse(event.newValue) as EmergencyDispatchNotification[]

@@ -78,9 +78,10 @@
 /* Main Grid Layout */
 .sena-grid-layout {
   display: grid;
-  grid-template-columns: 340px 1fr 380px;
+  grid-template-columns: 320px minmax(360px, 1fr) 380px;
   gap: 16px;
   min-height: 640px;
+  align-items: stretch;
 }
 
 .sena-panel {
@@ -164,14 +165,78 @@
   font-weight: 600;
 }
 
+.sena-workspace .error-message,
+.sena-workspace .success-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sena-workspace .error-message {
+  background: rgba(217, 74, 74, 0.14);
+  border: 1px solid rgba(217, 74, 74, 0.55);
+  color: #ffb4ab;
+}
+
+.sena-workspace .success-message {
+  background: rgba(131, 185, 107, 0.14);
+  border: 1px solid rgba(131, 185, 107, 0.55);
+  color: var(--tactical);
+}
+
+.sena-workspace .no-reports-message {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--sage);
+  font-size: 12px;
+  margin: 0;
+}
+
+.priority-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+.priority-badge.critical {
+  background: rgba(217, 74, 74, 0.2);
+  border-color: #ef8585;
+  color: #ffb4ab;
+}
+
+.priority-badge.high {
+  background: rgba(217, 164, 65, 0.2);
+  border-color: #f5bd58;
+  color: #ffdeaa;
+}
+
+.priority-badge.medium {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #7bd0ff;
+  color: #bae6fd;
+}
+
+.priority-badge.low {
+  background: rgba(166, 181, 165, 0.15);
+  border-color: var(--border);
+  color: var(--sage);
+}
+
 .sena-incident-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 700px;
+  max-height: 680px;
 }
 
 .sena-incident-card {
@@ -280,21 +345,43 @@
 /* Map area */
 .sena-map-panel {
   position: relative;
-  min-height: 520px;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
 }
 
 .sena-map-wrapper {
   width: 100%;
   height: 100%;
-  min-height: 520px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 560px;
 }
 
 .sena-leaflet-map,
 .sena-map-panel .leaflet-container {
   width: 100%;
   height: 100%;
-  min-height: 520px;
+  flex: 1 1 auto;
+  min-height: 480px;
   background: #111a14;
+}
+
+.sena-live-beacon-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(147, 0, 10, 0.45);
+  border: 1px solid #ffb4ab;
+  color: #ffdad6;
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* Map Pins */
@@ -368,12 +455,28 @@
 
 /* Detail & Dispatch Action Panel */
 .sena-detail-scroll {
-  padding: 16px;
+  padding: 14px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: 700px;
+  max-height: 760px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+.sena-primary-mission-card h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--paper);
+}
+
+.sena-primary-mission-card .description-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sage);
 }
 
 .sena-incident-summary-card {
@@ -444,6 +547,8 @@
 }
 
 .sena-unit-option-card {
+  width: 100%;
+  text-align: left;
   padding: 8px 10px;
   border: 1px solid var(--border);
   background: var(--olive);
@@ -451,8 +556,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   font-size: 12px;
   transition: all 0.15s ease;
+}
+
+.sena-unit-option-card:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .sena-unit-option-card:hover {
@@ -573,12 +684,27 @@
   font-weight: 600;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1320px) {
+  .sena-grid-layout {
+    grid-template-columns: 300px 1fr;
+  }
+  .sena-grid-layout > aside:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 960px) {
   .sena-grid-layout {
     grid-template-columns: 1fr;
   }
   .sena-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .sena-metrics {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -631,6 +757,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .sena-telemetry-grid {

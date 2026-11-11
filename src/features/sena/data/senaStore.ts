@@ -2,7 +2,19 @@ import { defaultResponseUnits } from './responseUnits.ts'
 import type { DispatchOrder, FieldLogEntry, ResponseUnit, SenaDispatchStatus, SenaIncidentItem } from '../types'
 import type { MedhaHandoffIncident } from '../../medha/data/repository'
 import type { MedhaPriority } from '../../medha/data/intelligence'
+import type { SanketCategory } from '../../sanket/types'
 import { reportStore } from '../../sanket/data/reportStore.ts'
+
+const VALID_CATEGORIES = new Set<SanketCategory>([
+  'flooding',
+  'waterlogging',
+  'blocked_road',
+  'damaged_infrastructure',
+  'medical_assistance',
+  'shelter_required',
+  'food_water',
+  'other',
+])
 
 const previewVerifiedIncidents: SenaIncidentItem[] = [
   {
@@ -100,10 +112,48 @@ const previewVerifiedIncidents: SenaIncidentItem[] = [
   },
 ]
 
+const DISPATCH_STORAGE_KEY = 'abhedya.sena.dispatches_v1'
+
 class SenaStore {
   private units: ResponseUnit[] = JSON.parse(JSON.stringify(defaultResponseUnits))
   private dispatches: Map<string, DispatchOrder> = new Map()
   private incidentOverlays: Map<string, Partial<SenaIncidentItem>> = new Map()
+
+  constructor() {
+    this.hydrateFromStorage()
+  }
+
+  private hydrateFromStorage() {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(DISPATCH_STORAGE_KEY)
+      if (!raw) return
+      const entries = JSON.parse(raw) as [string, DispatchOrder][]
+      if (!Array.isArray(entries)) return
+      for (const [incidentId, order] of entries) {
+        if (!incidentId || !order) continue
+        this.dispatches.set(incidentId, order)
+        if (order.status !== 'resolved') {
+          const unit = this.units.find((u) => u.id === order.unitId)
+          if (unit) {
+            unit.status = 'deployed'
+            unit.assignedIncidentId = incidentId
+          }
+        }
+      }
+    } catch {
+      // ignore corrupted storage
+    }
+  }
+
+  private persistToStorage() {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(DISPATCH_STORAGE_KEY, JSON.stringify(Array.from(this.dispatches.entries())))
+    } catch {
+      // ignore storage quota errors
+    }
+  }
 
   getUnits(): ResponseUnit[] {
     return [...this.units]
@@ -138,6 +188,7 @@ class SenaStore {
         if ((report.reportType === 'sos' || report.urgency === 'critical') && !list.some((item) => item.id === report.id)) {
           const dispatch = this.dispatches.get(report.id) ?? null
           const overlay = this.incidentOverlays.get(report.id) ?? {}
+          const loc = report.location || {}
           list.unshift({
             id: report.id,
             reportType: report.reportType,
@@ -148,12 +199,69 @@ class SenaStore {
             priorityReason: 'Real-time emergency distress beacon dispatch',
             summary: report.summary,
             details: report.details,
-            location: report.location,
-            assistanceNeeds: report.assistanceNeeds,
-            reportedImpacts: report.reportedImpacts,
-            reporterName: report.reporter.name,
-            reporterPhone: report.reporter.phone,
-            verifiedAt: report.createdAt,
+            location: {
+              label: loc.label || loc.locality || 'Emergency Incident Location',
+              locality: loc.locality || 'Udupi',
+              taluk: loc.taluk || 'Udupi',
+              district: loc.district || 'Udupi',
+              latitude: loc.latitude ?? 13.3408,
+              longitude: loc.longitude ?? 74.7421,
+              source: loc.source || 'device',
+            },
+            assistanceNeeds: report.assistanceNeeds || ['rescue', 'evacuation'],
+            reportedImpacts: report.reportedImpacts || {
+              peopleAffected: 1,
+              reportedInjuries: 0,
+              vulnerablePeople: 0,
+              peopleTrapped: 1,
+            },
+            reporterName: report.reporter?.name || 'Citizen Victim',
+            reporterPhone: report.reporter?.phone || '+91 98450 00000',
+            verifiedAt: report.createdAt || new Date().toISOString(),
+            activeDispatch: dispatch,
+            ...overlay,
+          })
+        }
+      }
+
+      const emergencies = reportStore.getEmergencyNotifications()
+      for (const notif of emergencies) {
+        const repId = notif.reportId || notif.id
+        if (repId && !list.some((item) => item.id === repId)) {
+          const dispatch = this.dispatches.get(repId) ?? null
+          const overlay = this.incidentOverlays.get(repId) ?? {}
+          const category: SanketCategory = VALID_CATEGORIES.has(notif.threat as SanketCategory)
+            ? (notif.threat as SanketCategory)
+            : 'flooding'
+          list.unshift({
+            id: repId,
+            reportType: 'sos',
+            category,
+            urgency: 'critical',
+            priority: 'critical',
+            prioritySource: 'automated_assessment',
+            priorityReason: 'Live SOS beacon received via Emergency Dispatch stream',
+            summary: notif.summary,
+            details: notif.details,
+            location: {
+              label: notif.location.locality || 'Emergency SOS Beacon',
+              locality: notif.location.locality || 'Udupi',
+              taluk: notif.location.taluk || 'Udupi',
+              district: notif.location.district || 'Udupi',
+              latitude: notif.location.latitude ?? 13.3408,
+              longitude: notif.location.longitude ?? 74.7421,
+              source: 'device',
+            },
+            assistanceNeeds: ['rescue', 'evacuation'],
+            reportedImpacts: {
+              peopleAffected: 1,
+              reportedInjuries: null,
+              vulnerablePeople: null,
+              peopleTrapped: 1,
+            },
+            reporterName: notif.reporter?.name || 'Citizen SOS Caller',
+            reporterPhone: notif.reporter?.phone || '+91 94812 99999',
+            verifiedAt: notif.timestamp,
             activeDispatch: dispatch,
             ...overlay,
           })
@@ -233,11 +341,13 @@ class SenaStore {
     unit.assignedIncidentId = params.incidentId
 
     this.dispatches.set(params.incidentId, order)
+    this.persistToStorage()
 
     // Also update reportStore if local preview report exists
     try {
       reportStore.assignReport(params.incidentId, unit.name, `Dispatched response unit ${unit.callSign}`)
       reportStore.updateStatus(params.incidentId, 'in_progress', params.assignedBy, `Team ${unit.callSign} mobilized`)
+      reportStore.acknowledgeEmergency(params.incidentId, unit.name)
     } catch {
       // non-blocking
     }
@@ -294,6 +404,7 @@ class SenaStore {
       }
     }
 
+    this.persistToStorage()
     return order
   }
 
@@ -310,6 +421,7 @@ class SenaStore {
     }
     order.fieldLogs.push(entry)
     order.updatedAt = entry.at
+    this.persistToStorage()
     return entry
   }
 }

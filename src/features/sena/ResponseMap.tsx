@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2, Compass, Layers, LocateFixed, Send, Thermo
 import { Button } from '../../components/ui/button'
 import type { ResponseUnit, SenaDispatchStatus, SenaIncidentItem } from './types'
 
-interface DistrictBoundary {
+export interface DistrictBoundary {
   type: 'Feature'
   properties: { shapeID: string; [key: string]: unknown }
   geometry: {
@@ -16,6 +16,8 @@ interface DistrictBoundary {
     coordinates: number[][][] | number[][][][]
   }
 }
+
+export type BoundaryInput = DistrictBoundary | { type: 'FeatureCollection'; features: DistrictBoundary[] }
 
 interface DispatchVector {
   incidentId: string
@@ -33,8 +35,26 @@ function collectPositions(value: unknown, positions: number[][] = []): number[][
   return positions
 }
 
-function getBoundaryExtent(boundary: DistrictBoundary) {
-  const positions = collectPositions(boundary.geometry.coordinates)
+function extractDistrictFeature(boundary: BoundaryInput | null): DistrictBoundary | null {
+  if (!boundary) return null
+  if ('geometry' in boundary && boundary.geometry?.coordinates) {
+    return boundary
+  }
+  if ('features' in boundary && Array.isArray(boundary.features)) {
+    return (
+      boundary.features.find((item) => item?.properties?.shapeID === '76128533B4839184447445') ??
+      boundary.features.find((item) => Boolean(item?.geometry?.coordinates)) ??
+      null
+    )
+  }
+  return null
+}
+
+function getBoundaryExtent(boundary: BoundaryInput | null) {
+  const feature = extractDistrictFeature(boundary)
+  if (!feature?.geometry?.coordinates) return null
+  const positions = collectPositions(feature.geometry.coordinates)
+  if (positions.length === 0) return null
   const longitudes = positions.map(([longitude]) => longitude)
   const latitudes = positions.map(([, latitude]) => latitude)
   const south = Math.min(...latitudes)
@@ -49,27 +69,56 @@ function getBoundaryExtent(boundary: DistrictBoundary) {
 
 function MapViewSync({
   bounds,
-  selectedCoords,
+  selectedLat,
+  selectedLon,
+  focusRequest,
+  externalFocusNonce,
 }: {
   bounds: LatLngBoundsExpression | null
-  selectedCoords: LatLngTuple | null
+  selectedLat: number | null
+  selectedLon: number | null
+  focusRequest: { target: 'incident' | 'hq'; nonce: number } | null
+  externalFocusNonce: number
 }) {
   const map = useMap()
+
   useEffect(() => {
     map.invalidateSize()
-    if (selectedCoords) {
-      map.flyTo(selectedCoords, 13, { duration: 0.8 })
+    if (selectedLat !== null && selectedLon !== null) {
+      map.flyTo([selectedLat, selectedLon], 13, { duration: 0.7 })
       return
     }
     if (bounds) {
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 11 })
     }
-  }, [bounds, map, selectedCoords])
+  }, [bounds, map, selectedLat, selectedLon])
+
+  useEffect(() => {
+    if (!focusRequest) return
+    map.invalidateSize()
+    if (focusRequest.target === 'incident' && selectedLat !== null && selectedLon !== null) {
+      map.flyTo([selectedLat, selectedLon], 14, { duration: 0.7 })
+    } else if (focusRequest.target === 'hq') {
+      if (bounds) {
+        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 11 })
+      } else {
+        map.flyTo([13.3408, 74.7421], 11, { duration: 0.7 })
+      }
+    }
+  }, [bounds, focusRequest, map, selectedLat, selectedLon])
+
+  useEffect(() => {
+    if (externalFocusNonce <= 0) return
+    map.invalidateSize()
+    if (selectedLat !== null && selectedLon !== null) {
+      map.flyTo([selectedLat, selectedLon], 14, { duration: 0.7 })
+    }
+  }, [externalFocusNonce, map, selectedLat, selectedLon])
 
   useEffect(() => {
     const timer = setTimeout(() => {
       map.invalidateSize()
-    }, 150)
+    }, 180)
     return () => clearTimeout(timer)
   }, [map])
 
@@ -123,29 +172,32 @@ export default function ResponseMap({
   units,
   selectedIncidentId,
   boundary,
+  externalFocusNonce = 0,
   onSelectIncident,
+  onFocusCommand,
 }: {
   incidents: SenaIncidentItem[]
   units: ResponseUnit[]
   selectedIncidentId: string | null
-  boundary: DistrictBoundary | null
+  boundary: BoundaryInput | null
+  externalFocusNonce?: number
   onSelectIncident: (id: string) => void
+  onFocusCommand?: () => void
 }) {
-  const extent = useMemo(() => (boundary ? getBoundaryExtent(boundary) : null), [boundary])
+  const districtFeature = useMemo(() => extractDistrictFeature(boundary), [boundary])
+  const extent = useMemo(() => getBoundaryExtent(districtFeature), [districtFeature])
   const bounds = extent?.bounds ?? null
   const defaultCenter: LatLngTuple = extent?.center ?? [13.45, 74.75]
 
   const selectedIncident = useMemo(
-    () => incidents.find((i) => i.id === selectedIncidentId),
+    () => incidents.find((i) => i.id === selectedIncidentId) ?? null,
     [incidents, selectedIncidentId],
   )
 
-  const selectedCoords: LatLngTuple | null = useMemo(() => {
-    if (selectedIncident?.location.latitude && selectedIncident?.location.longitude) {
-      return [selectedIncident.location.latitude, selectedIncident.location.longitude]
-    }
-    return null
-  }, [selectedIncident])
+  const selectedLat = selectedIncident?.location.latitude ?? null
+  const selectedLon = selectedIncident?.location.longitude ?? null
+
+  const [focusRequest, setFocusRequest] = useState<{ target: 'incident' | 'hq'; nonce: number } | null>(null)
 
   // Pairs of coordinates for dispatch vector lines
   const dispatchVectors = useMemo(() => {
@@ -175,8 +227,18 @@ export default function ResponseMap({
     setTimeout(() => setToastMessage(null), 2400)
   }
 
+  const availableUnitsCount = useMemo(() => units.filter((u) => u.status === 'available').length, [units])
+  const dispatchedCount = useMemo(
+    () => incidents.filter((i) => i.activeDispatch && i.activeDispatch.status !== 'resolved').length,
+    [incidents],
+  )
+  const pendingCount = useMemo(
+    () => incidents.filter((i) => !i.activeDispatch || i.activeDispatch.status === 'pending_dispatch').length,
+    [incidents],
+  )
+
   return (
-    <div className="sena-map-wrapper" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+    <div className="sena-map-wrapper" style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '560px' }}>
       {/* Operational Status Bar Ribbon */}
       <div
         style={{
@@ -191,212 +253,240 @@ export default function ResponseMap({
       >
         <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
           <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
-            RIVER LEVEL
+            QUEUE PENDING
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
-            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-coral)' }}>14.82m</strong>
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-coral)', fontWeight: 700 }}>+18cm/h</span>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-coral)' }}>{pendingCount}</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', fontWeight: 700 }}>AWAITING SAR</span>
           </div>
         </div>
 
         <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
           <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
-            WEATHER INFLOW
+            ACTIVE MISSIONS
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
-            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)' }}>88mm/h</strong>
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>45kt</span>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-sky)' }}>{dispatchedCount}</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>EN ROUTE / SCENE</span>
           </div>
         </div>
 
         <div style={{ background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: '4px' }}>
           <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--sage)', textTransform: 'uppercase', display: 'block' }}>
-            DISTRESS / RESCUE
+            FORCE READINESS
           </span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginTop: '2px' }}>
-            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)' }}>{incidents.length}</strong>
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)' }}>{units.length} ASN</span>
+            <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent-amber)' }}>{availableUnitsCount}/{units.length}</strong>
+            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--tactical)' }}>STANDBY</span>
           </div>
         </div>
       </div>
 
-      {/* Floating Tactical Deck Right Controls */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '64px',
-          right: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px',
-          zIndex: 1000,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => triggerToast('Compass Heading Calibrated to True North')}
-          title="Align True North"
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '6px',
-            background: 'var(--panel)',
-            border: '1px solid var(--border)',
-            color: 'var(--tactical)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          }}
-        >
-          <span style={{ fontSize: '8px', color: 'var(--accent-coral)', fontWeight: 800, lineHeight: 1 }}>N</span>
-          <Compass size={14} aria-hidden="true" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setShowHazards(!showHazards)
-            triggerToast(showHazards ? 'Hazards & Vector Overlays Hidden' : 'Hazards & Vector Overlays Enabled')
-          }}
-          title="Toggle Hazard Layers"
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '6px',
-            background: showHazards ? 'rgba(123, 208, 255, 0.2)' : 'var(--panel)',
-            border: '1px solid var(--border)',
-            color: 'var(--accent-sky)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          }}
-        >
-          <Layers size={16} aria-hidden="true" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setShowThermal(!showThermal)
-            triggerToast(showThermal ? 'FLIR Thermal Palette Deactivated' : 'FLIR Thermal Palette Active')
-          }}
-          title="Toggle Thermal Recon"
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '6px',
-            background: showThermal ? 'rgba(245, 189, 88, 0.25)' : 'var(--panel)',
-            border: '1px solid var(--border)',
-            color: 'var(--accent-amber)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          }}
-        >
-          <Thermometer size={16} aria-hidden="true" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => triggerToast('GPS RTK Centered on Udupi Operations HQ')}
-          title="Center HQ"
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '6px',
-            background: 'var(--panel)',
-            border: '1px solid var(--border)',
-            color: 'var(--paper)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          }}
-        >
-          <LocateFixed size={16} aria-hidden="true" />
-        </button>
-      </div>
-
-      {/* Map Coordinate Crosshairs Monospace */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '64px',
-          left: '12px',
-          background: 'rgba(8, 22, 15, 0.85)',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          padding: '4px 8px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2px',
-          pointerEvents: 'none',
-          zIndex: 1000,
-        }}
-      >
-        <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--tactical)' }}>
-          GRID: 43Q-ND-1907-7287
-        </span>
-        <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>
-          ELEV: +16.4m MSL • HDOP 0.8m
-        </span>
-      </div>
-
-      {/* Interactive Toast Popup */}
-      {toastMessage && (
+      {/* Dedicated Relative Map Stage Wrapper so overlays align cleanly inside the map area */}
+      <div style={{ position: 'relative', flex: '1 1 auto', display: 'flex', flexDirection: 'column', minHeight: '480px' }}>
+        {/* Floating Tactical Deck Right Controls */}
         <div
           style={{
             position: 'absolute',
-            top: '64px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'var(--panel)',
-            border: '1px solid var(--tactical)',
-            color: 'var(--paper)',
-            padding: '6px 14px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            zIndex: 1500,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+            top: '12px',
+            right: '12px',
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
             gap: '6px',
+            zIndex: 1000,
           }}
         >
-          <CheckCircle2 size={14} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+          <button
+            type="button"
+            onClick={() => {
+              setFocusRequest((prev) => ({ target: 'incident', nonce: (prev?.nonce ?? 0) + 1 }))
+              triggerToast(
+                selectedIncident
+                  ? `Focused on Incident ${selectedIncident.id}`
+                  : 'Compass Aligned North',
+              )
+            }}
+            title="Center on Selected Incident"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              color: 'var(--tactical)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            }}
+          >
+            <span style={{ fontSize: '8px', color: 'var(--accent-coral)', fontWeight: 800, lineHeight: 1 }}>N</span>
+            <Compass size={14} aria-hidden="true" />
+          </button>
 
-      <MapContainer
-        center={defaultCenter}
-        zoom={9}
-        minZoom={7}
-        maxZoom={16}
-        scrollWheelZoom
-        zoomControl={false}
-        className="sena-leaflet-map"
-        style={{ filter: showThermal ? 'hue-rotate(180deg) saturate(1.8)' : 'none' }}
-      >
-        <MapViewSync bounds={bounds} selectedCoords={selectedCoords} />
+          <button
+            type="button"
+            onClick={() => {
+              setShowHazards(!showHazards)
+              triggerToast(showHazards ? 'District & Vector Overlays Hidden' : 'District & Vector Overlays Enabled')
+            }}
+            title="Toggle District & Vector Overlays"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              background: showHazards ? 'rgba(123, 208, 255, 0.2)' : 'var(--panel)',
+              border: '1px solid var(--border)',
+              color: 'var(--accent-sky)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            }}
+          >
+            <Layers size={16} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowThermal(!showThermal)
+              triggerToast(showThermal ? 'High-Contrast Palette Deactivated' : 'High-Contrast Palette Active')
+            }}
+            title="Toggle High-Contrast Thermal Palette"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              background: showThermal ? 'rgba(245, 189, 88, 0.25)' : 'var(--panel)',
+              border: '1px solid var(--border)',
+              color: 'var(--accent-amber)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            }}
+          >
+            <Thermometer size={16} aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFocusRequest((prev) => ({ target: 'hq', nonce: (prev?.nonce ?? 0) + 1 }))
+              triggerToast('Centered on Udupi District Overview')
+            }}
+            title="Reset View to District Overview"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              color: 'var(--paper)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            }}
+          >
+            <LocateFixed size={16} aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Live Selected Coordinates Readout */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '12px',
+            left: '12px',
+            background: 'rgba(8, 22, 15, 0.88)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            padding: '4px 8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            pointerEvents: 'none',
+            zIndex: 1000,
+          }}
+        >
+          <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--tactical)' }}>
+            {selectedLat !== null && selectedLon !== null
+              ? `POS: ${selectedLat.toFixed(4)}° N, ${selectedLon.toFixed(4)}° E`
+              : 'DISTRICT: UDUPI ADM2'}
+          </span>
+          <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)', color: 'var(--sage)' }}>
+            {selectedIncident
+              ? `${selectedIncident.id} • ${selectedIncident.location.locality || selectedIncident.location.taluk || 'Udupi'}`
+              : `${incidents.length} Incidents • ${units.length} SAR Units`}
+          </span>
+        </div>
+
+        {/* Interactive Toast Popup */}
+        {toastMessage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'var(--panel)',
+              border: '1px solid var(--tactical)',
+              color: 'var(--paper)',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              zIndex: 1500,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <CheckCircle2 size={14} style={{ color: 'var(--tactical)' }} aria-hidden="true" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        <MapContainer
+          center={defaultCenter}
+          zoom={9}
+          minZoom={7}
+          maxZoom={16}
+          scrollWheelZoom
+          zoomControl={false}
+          className="sena-leaflet-map"
+          style={{
+            flex: '1 1 auto',
+            width: '100%',
+            minHeight: '480px',
+            filter: showThermal ? 'hue-rotate(180deg) saturate(1.8)' : 'none',
+          }}
+        >
+          <MapViewSync
+            bounds={bounds}
+            selectedLat={selectedLat}
+            selectedLon={selectedLon}
+            focusRequest={focusRequest}
+            externalFocusNonce={externalFocusNonce}
+          />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {boundary && showHazards && (
+        {districtFeature && showHazards && (
           <GeoJSON
-            key={boundary.properties.shapeID}
-            data={boundary as unknown as GeoJsonObject}
+            key={districtFeature.properties?.shapeID ?? 'udupi-district'}
+            data={districtFeature as unknown as GeoJsonObject}
             style={{
               color: '#83b96b',
               weight: 1.5,
@@ -471,13 +561,16 @@ export default function ResponseMap({
                       <em>Status: {incident.activeDispatch.status.replace('_', ' ').toUpperCase()}</em>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="sena-popup-select-btn"
-                      onClick={() => onSelectIncident(incident.id)}
-                    >
-                      Assign &amp; Dispatch Team &rarr;
-                    </button>
+                      <button
+                        type="button"
+                        className="sena-popup-select-btn"
+                        onClick={() => {
+                          onSelectIncident(incident.id)
+                          onFocusCommand?.()
+                        }}
+                      >
+                        Assign &amp; Dispatch Team &rarr;
+                      </button>
                   )}
                 </div>
               </Popup>
@@ -487,7 +580,8 @@ export default function ResponseMap({
 
         <ZoomControl position="bottomright" />
         <ScaleControl position="bottomleft" imperial={false} />
-      </MapContainer>
+        </MapContainer>
+      </div>
 
       {/* Real-time Incident Details Inspection Flyout Banner */}
       {selectedIncident && (
@@ -523,7 +617,9 @@ export default function ResponseMap({
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 800, color: 'var(--accent-coral)' }}>
                   {selectedIncident.id} • {selectedIncident.priority.toUpperCase()} EVAC
                 </span>
-                <span style={{ fontSize: '10px', color: 'var(--sage)' }}>• {selectedIncident.location.locality}</span>
+                <span style={{ fontSize: '10px', color: 'var(--sage)' }}>
+                  • {selectedIncident.location.locality || selectedIncident.location.label || 'Udupi'}
+                </span>
               </div>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--paper)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {selectedIncident.summary}
@@ -534,10 +630,14 @@ export default function ResponseMap({
           <Button
             size="sm"
             className="button button-primary"
-            onClick={() => onSelectIncident(selectedIncident.id)}
+            onClick={() => {
+              onSelectIncident(selectedIncident.id)
+              onFocusCommand?.()
+            }}
             style={{ flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 700, height: '30px' }}
           >
-            <Send size={12} aria-hidden="true" /> DISPATCH
+            <Send size={12} aria-hidden="true" />
+            {selectedIncident.activeDispatch ? 'COMMAND' : 'DISPATCH'}
           </Button>
         </div>
       )}

@@ -152,3 +152,52 @@ test('handoff conversion maps priority provenance and verified report fields', (
   assert.deepEqual(senaItem.assistanceNeeds, ['rescue', 'medical'])
 })
 
+test('preview incidents safely map emergency SOS reports with missing optional location label', async () => {
+  const { reportStore } = await import('../src/features/sanket/data/reportStore.ts')
+  const created = reportStore.add({
+    reportType: 'sos',
+    category: 'flooding',
+    urgency: 'critical',
+    location: {
+      label: '',
+      locality: 'Malpe Harbor Sector',
+      taluk: 'Udupi',
+      district: 'Udupi',
+      latitude: 13.3502,
+      longitude: 74.7001,
+      source: 'device',
+    },
+    reporter: {
+      name: 'Test SOS Caller',
+      phone: '+91 90000 12345',
+      contactPreference: 'phone',
+    },
+    reportedImpacts: {
+      peopleAffected: 3,
+      reportedInjuries: 0,
+      vulnerablePeople: 1,
+      peopleTrapped: 2,
+    },
+    assistanceNeeds: ['rescue', 'evacuation'],
+    summary: 'Boat stranded near Malpe jetty',
+    details: 'Rising tide pushing water over jetty.',
+  })
+
+  const previewIncidents = senaStore.getPreviewIncidents()
+  const synced = previewIncidents.find((i) => i.id === created.id)
+  assert.ok(synced, 'Expected newly submitted SOS report to appear in SENA preview queue')
+  assert.ok(synced.location.label, 'Expected location.label fallback to be populated')
+  assert.equal(synced.location.latitude, 13.3502)
+  assert.equal(synced.priority, 'critical')
+})
+
+test('udupi district geojson contains a FeatureCollection with extractable Udupi polygon coordinates', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const raw = await readFile(new URL('../public/data/drishti/udupi-district.geojson', import.meta.url), 'utf8')
+  const collection = JSON.parse(raw)
+  assert.equal(collection.type, 'FeatureCollection')
+  assert.ok(Array.isArray(collection.features) && collection.features.length > 0)
+  const feature = collection.features.find((item) => item.properties?.shapeID === '76128533B4839184447445') ?? collection.features[0]
+  assert.ok(feature?.geometry?.coordinates, 'Expected extracted district feature to expose geometry.coordinates')
+})
+
