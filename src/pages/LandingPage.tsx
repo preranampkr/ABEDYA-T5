@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, Waves } from 'lucide-react'
+import { ArrowRight, ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import EmergencyRequestForm from '../components/EmergencyRequestForm'
 import SiteHeader from '../components/SiteHeader'
@@ -26,30 +26,6 @@ function LandingPage() {
               </a>
             </div>
           </div>
-
-          <aside className="response-framework" aria-label="ABHEDYA response framework">
-            <div className="framework-heading">
-              <span className="framework-icon"><Waves size={18} aria-hidden="true" /></span>
-              <span>RESPONSE FRAMEWORK</span>
-              <span className="framework-index">01 — 03</span>
-            </div>
-            <div className="framework-row">
-              <span className="framework-step">01</span>
-              <div><h2>Before</h2><p>Preparedness &amp; awareness</p></div>
-              <span className="framework-line" />
-            </div>
-            <div className="framework-row">
-              <span className="framework-step">02</span>
-              <div><h2>During</h2><p>Reporting &amp; coordination</p></div>
-              <span className="framework-line" />
-            </div>
-            <div className="framework-row">
-              <span className="framework-step">03</span>
-              <div><h2>Beyond</h2><p>Relief &amp; recovery</p></div>
-              <span className="framework-line" />
-            </div>
-            <p className="framework-footnote">A platform foundation · No live feeds connected</p>
-          </aside>
         </section>
       </div>
 
