@@ -131,10 +131,69 @@ const liveProvider: LiveDataProvider = {
   },
 
   async getCurrentObservations() {
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await fetch('/api/drishti/observations')
+        if (response.ok) {
+          const payload = await response.json() as {
+            state?: string
+            retrievedAt?: string
+            provider?: { id: string; label: string; organization: string; url?: string }
+            current?: {
+              observedAt?: string
+              temperature?: number | null
+              relativeHumidity?: number | null
+              windSpeed?: number | null
+            }
+          }
+          if (
+            payload.state === 'available' &&
+            typeof payload.current?.temperature === 'number' &&
+            typeof payload.current?.relativeHumidity === 'number' &&
+            typeof payload.current?.windSpeed === 'number'
+          ) {
+            const retrievedAt = payload.retrievedAt ?? new Date().toISOString()
+            const liveSource: DataSourceRef = {
+              id: payload.provider?.id ?? 'open-meteo-udupi',
+              label: payload.provider?.label ?? 'Open-Meteo Live Weather Feed',
+              organization: payload.provider?.organization ?? 'Open-Meteo API',
+              mode: 'live',
+              url: payload.provider?.url ?? 'https://open-meteo.com/',
+            }
+            const record: WeatherObservation = {
+              id: `live-weather-${Date.now()}`,
+              value: {
+                temperature: payload.current.temperature,
+                relativeHumidity: payload.current.relativeHumidity,
+                windSpeed: payload.current.windSpeed,
+              },
+              observedAt: payload.current.observedAt ?? retrievedAt,
+              retrievedAt,
+              units: 'temperature: °C; humidity: %; wind: km/h',
+              category: 'weather',
+              source: liveSource,
+              locationId: district.id,
+              locationLabel: 'Udupi District coordinates (13.3409°N, 74.7421°E) via Vercel backend',
+              coordinates: { latitude: 13.3409, longitude: 74.7421 },
+            }
+            return {
+              mode: 'live',
+              state: 'available',
+              records: [record],
+              source: liveSource,
+              retrievedAt,
+              detail: 'Live weather telemetry retrieved from Open-Meteo via Vercel serverless backend (/api/drishti/observations).',
+            }
+          }
+        }
+      } catch {
+        // Offline or standalone Vite preview without Vercel backend
+      }
+    }
     return unavailableResult(
       'live',
       sourceCatalog.imd,
-      'No official observation API is connected. Demonstration values are never substituted into live mode.',
+      'Live Vercel weather backend unavailable in standalone mode and no official IMD credentials are configured.',
     )
   },
 

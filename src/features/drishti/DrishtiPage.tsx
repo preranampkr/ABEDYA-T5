@@ -236,6 +236,7 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
   const [sourceStatuses, setSourceStatuses] = useState<DataSourceStatus[]>([])
   const [demoRainfall, setDemoRainfall] = useState<RainfallObservation[]>([])
   const [demoWeather, setDemoWeather] = useState<WeatherObservation | undefined>()
+  const [liveWeather, setLiveWeather] = useState<WeatherObservation | undefined>()
   const [historicalFloodDetail, setHistoricalFloodDetail] = useState('Historical flood dataset is unavailable.')
   const [timelineIndex, setTimelineIndex] = useState(0)
 
@@ -263,10 +264,11 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
     const controller = new AbortController()
 
     async function loadData() {
-      const [statuses, rainfall, weather, historical] = await Promise.all([
+      const [statuses, rainfall, weather, liveObs, historical] = await Promise.all([
         drishtiProviders.live.getSourceStatuses(),
         drishtiProviders.demonstration.getRainfallTimeline(),
         drishtiProviders.demonstration.getCurrentWeather(),
+        drishtiProviders.live.getCurrentObservations(),
         drishtiProviders.historical.getFloodRecords(),
       ])
 
@@ -274,6 +276,11 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
       setSourceStatuses(statuses)
       setDemoRainfall(rainfall.records)
       setDemoWeather(weather.records[0])
+      setLiveWeather(
+        liveObs.state === 'available' && liveObs.records[0]?.category === 'weather'
+          ? (liveObs.records[0] as WeatherObservation)
+          : undefined,
+      )
       setHistoricalFloodDetail(historical.detail)
       setTimelineIndex(Math.max(0, rainfall.records.length - 1))
 
@@ -456,7 +463,8 @@ function DrishtiPage({ role }: { role: 'victim' | 'helper' }) {
             </div>
           )}
           {dataMode === 'demonstration' ? <ObservationValue rainfall={selectedRainfall} weather={demoWeather} /> : null}
-          {liveMode && <UnavailablePanel title="Live observations unavailable" detail="No IMD, KSNDMC, or CWC observation feed is connected. Demonstration values are not substituted in this mode." />}
+          {liveMode && liveWeather ? <ObservationValue weather={liveWeather} /> : null}
+          {liveMode && !liveWeather && <UnavailablePanel title="Live observations unavailable" detail="No IMD, KSNDMC, or CWC observation feed is connected. Demonstration values are not substituted in this mode." />}
           {historicalMode && <UnavailablePanel title="Historical observations unavailable" detail="No verified station-level rainfall, weather, or river archive is connected." />}
           <div className="drishti-situation-list">
             <StatusIndicator tone={boundaryState === 'ready' ? 'ready' : 'warning'}>{boundaryState === 'ready' ? 'DISTRICT BOUNDARY LOADED' : 'BOUNDARY STATUS'}</StatusIndicator>

@@ -278,7 +278,54 @@ export const reportRepository = {
   },
 
   subscribeEmergency(listener: (notification: EmergencyDispatchNotification) => void) {
-    return reportStore.subscribeEmergency(listener)
+    const unsubscribeLocal = reportStore.subscribeEmergency(listener)
+    if (isLocalPrototype() || !supabase) {
+      return unsubscribeLocal
+    }
+
+    const client = supabase
+    const channel = client
+      .channel('abhedya-sanket-sos')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'sanket_reports' },
+        (payload) => {
+          const row = asObject(payload.new)
+          const reportType = asString(row.report_type)
+          const urgency = asString(row.urgency)
+          if (reportType !== 'sos' && urgency !== 'critical') return
+
+          const id = asString(row.id)
+          if (!id) return
+          const notification: EmergencyDispatchNotification = {
+            id: `DISP-${id}`,
+            reportId: id,
+            timestamp: asString(row.created_at, new Date().toISOString()),
+            threat: asString(row.category, 'flooding'),
+            summary: asString(row.summary, 'Live Emergency SOS Dispatch'),
+            details: asString(row.details),
+            location: {
+              locality: asString(row.locality, 'Udupi District'),
+              taluk: asString(row.taluk, 'Udupi'),
+              district: asString(row.district, 'Udupi'),
+              latitude: typeof row.latitude === 'number' ? row.latitude : 13.3408,
+              longitude: typeof row.longitude === 'number' ? row.longitude : 74.7421,
+            },
+            reporter: {
+              name: 'Citizen Distress Caller',
+              phone: 'Protected (Verify in Queue)',
+            },
+            acknowledged: false,
+          }
+          listener(notification)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      unsubscribeLocal()
+      void client.removeChannel(channel)
+    }
   },
 
   acknowledgeEmergency(id: string, helperName?: string) {
